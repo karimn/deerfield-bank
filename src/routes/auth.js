@@ -48,4 +48,4 @@ router.get('/check', (req, res) => {
   res.json({ isAuthenticated: false });
 });
 
-module.exports = router;  s
+module.exports = router;
