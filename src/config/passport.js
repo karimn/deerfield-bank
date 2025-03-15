@@ -10,11 +10,15 @@ module.exports = function() {
   }, 
   async (accessToken, refreshToken, profile, done) => {
     try {
+      console.log('Google auth callback triggered');
+      console.log('Profile:', profile.displayName, profile.emails[0].value);
+      
       // Check if user already exists
       let user = await User.findOne({ googleId: profile.id });
       
       if (user) {
         // User exists, return the user
+        console.log('Existing user found:', user.name);
         return done(null, user);
       }
       
@@ -24,12 +28,14 @@ module.exports = function() {
       
       if (user) {
         // Email exists but not linked to Google, update the user
+        console.log('Updating existing user with Google ID');
         user.googleId = profile.id;
         await user.save();
         return done(null, user);
       }
       
       // Create a new user (will need admin approval to set role)
+      console.log('Creating new user');
       const newUser = await User.create({
         name: profile.displayName,
         email: profile.emails[0].value,
@@ -39,6 +45,7 @@ module.exports = function() {
       
       return done(null, newUser);
     } catch (err) {
+      console.error('Error in Google strategy:', err);
       return done(err, null);
     }
   }));

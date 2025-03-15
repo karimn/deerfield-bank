@@ -13,20 +13,20 @@ router.get('/google',
 // @desc    Google auth callback
 // @access  Public
 router.get('/google/callback', 
-  passport.authenticate('google', { failureRedirect: '/' }),
+  passport.authenticate('google', { failureRedirect: '/login.html' }),
   (req, res) => {
-    // Successful authentication
-    res.redirect('/dashboard');
+    // Successful authentication - redirect to dashboard.html (not dashboard)
+    res.redirect('/dashboard.html');
   }
 );
 
 // @route   GET /auth/logout
 // @desc    Logout user
 // @access  Private
-router.get('/logout', (req, res) => {
+router.get('/logout', (req, res, next) => {
   req.logout(function(err) {
     if (err) { return next(err); }
-    res.redirect('/');
+    res.redirect('/login.html');
   });
 });
 

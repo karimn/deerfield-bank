@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auth Debug - Allowance Tracker</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      padding-top: 2rem;
+    }
+    .status-card {
+      margin-bottom: 1.5rem;
+      box-shadow: 0 4px 6px rgba(0,0,0,.1);
+    }
+    .json-display {
+      background-color: #f8f9fa;
+      border-radius: 5px;
+      padding: 15px;
+      white-space: pre-wrap;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="pb-3 mb-4 border-bottom">
+      <h1 class="display-5 fw-bold">Authentication Debug</h1>
+    </header>
+
+    <div class="row">
+      <div class="col-12">
+        <div class="card status-card">
+          <div class="card-header">
+            <h5 class="mb-0">Authentication Status</h5>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <div class="d-flex justify-content-between">
+                <h6>Status:</h6>
+                <div id="auth-status">Checking...</div>
+              </div>
+            </div>
+            <div class="mb-3">
+              <h6>User Information:</h6>
+              <div class="json-display" id="user-info">Checking...</div>
+            </div>
+            <div class="mb-3">
+              <h6>Session Information:</h6>
+              <div class="json-display" id="session-info">Not available in client-side JavaScript</div>
+            </div>
+            <div class="d-grid gap-2">
+              <a href="/auth/google" class="btn btn-primary" id="login-btn">Sign in with Google</a>
+              <a href="/auth/logout" class="btn btn-outline-danger" id="logout-btn">Logout</a>
+              <a href="/dashboard.html" class="btn btn-outline-secondary" id="dashboard-btn">Go to Dashboard</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-12">
+        <div class="card status-card">
+          <div class="card-header">
+            <h5 class="mb-0">Environment Check</h5>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <h6>Google OAuth Configuration:</h6>
+              <div id="oauth-check">
+                <p>To verify Google OAuth is configured correctly:</p>
+                <ol>
+                  <li>Make sure you have set GOOGLE_CLIENT_ID in your .env file</li>
+                  <li>Make sure you have set GOOGLE_CLIENT_SECRET in your .env file</li>
+                  <li>Verify the callback URL is correctly set in Google Cloud Console</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap & JavaScript -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async function() {
+      try {
+        // Check authentication status
+        const response = await fetch('/auth/check');
+        const data = await response.json();
+        
+        // Update UI based on authentication status
+        if (data.isAuthenticated) {
+          document.getElementById('auth-status').innerHTML = '<span class="badge bg-success">Authenticated</span>';
+          document.getElementById('user-info').textContent = JSON.stringify(data.user, null, 2);
+          document.getElementById('login-btn').style.display = 'none';
+        } else {
+          document.getElementById('auth-status').innerHTML = '<span class="badge bg-danger">Not Authenticated</span>';
+          document.getElementById('user-info').textContent = 'No user information available';
+          document.getElementById('logout-btn').style.display = 'none';
+        }
+      } catch (error) {
+        console.error('Error checking auth status:', error);
+        document.getElementById('auth-status').innerHTML = '<span class="badge bg-warning text-dark">Error</span>';
+        document.getElementById('user-info').textContent = 'Error checking authentication status: ' + error.message;
+      }
+    });
+  </script>
+</body>
+</html>

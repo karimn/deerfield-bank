@@ -7,7 +7,9 @@ const connectDB = require('./config/db');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
 const passport = require('passport');
-//const path = require('path');
+const path = require('path');
+const fs = require('fs');
+const { ensureAuth } = require('./middleware/auth');
 
 // Load env vars
 dotenv.config();
@@ -24,19 +26,16 @@ const app = express();
 // Middleware
 app.use(express.json());
 app.use(cors());
-app.use(helmet());
-app.use(express.static('public'));
+app.use(helmet({
+  contentSecurityPolicy: false
+}));
 
 // Logging middleware
 if (process.env.NODE_ENV === 'development') {
-  // app.use(helmet({
-  //   contentSecurityPolicy: false
-  // }));
   app.use(morgan('dev'));
 }
 
-//app.use(express.static(path.join(__dirname, 'public')));
-
+// Session middleware
 app.use(session({
   secret: process.env.SESSION_SECRET || 'keyboard cat',
   resave: false,
@@ -53,55 +52,48 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Define routes
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+// Important: Serve static files from the correct directory
+// In your project, static files are in src/public
+app.use(express.static(path.join(__dirname, 'public')));
 
-
+// Auth routes
 app.use('/auth', require('./routes/auth'));
 
-// Initialize routes (will add these soon)
-// Routes
-app.use('/api/users', require('./routes/users'));
-app.use('/api/accounts', require('./routes/accounts'));
-// In server.js, where you define your routes
-app.use('/api/transactions', require('./routes/transactions'));
-app.use('/api/subscriptions', require('./routes/subscriptions'));
-app.use('/api', require('./routes/allowance'));
+// API routes - protect all API routes with ensureAuth
+app.use('/api/users', ensureAuth, require('./routes/users'));
+app.use('/api/accounts', ensureAuth, require('./routes/accounts'));
+app.use('/api/transactions', ensureAuth, require('./routes/transactions'));
+app.use('/api/subscriptions', ensureAuth, require('./routes/subscriptions'));
+app.use('/api', ensureAuth, require('./routes/allowance'));
 
-app.get('*', (req, res) => {
-  // Check if the path has an extension (like .js, .css, etc.)
-  const ext = path.extname(req.path);
-  
-  // If there's no extension and it looks like an HTML page request
-  if (!ext && req.path.indexOf('/api') !== 0 && req.path.indexOf('/auth') !== 0) {
-    // Try to find a matching HTML file in the public directory
-    const htmlFile = `${req.path}.html`;
-    const filePath = path.join(__dirname, 'public', req.path === '/' ? 'index.html' : req.path.slice(1));
-    const htmlFilePath = path.join(__dirname, 'public', htmlFile.slice(1));
-    
-    // Check if the file exists directly
-    if (fs.existsSync(filePath)) {
-      return res.sendFile(filePath);
-    }
-    // Check if an HTML version exists
-    else if (fs.existsSync(htmlFilePath)) {
-      return res.sendFile(htmlFilePath);
-    }
-    // Default to index.html for client-side routing
-    else {
-      return res.sendFile(path.join(__dirname, 'public', 'index.html'));
-    }
+// Redirect root to login or dashboard based on auth status
+app.get('/', (req, res) => {
+  if (req.isAuthenticated()) {
+    res.redirect('/dashboard.html');
+  } else {
+    res.redirect('/login.html');
   }
-  // If it's not an API or auth route and has an extension but wasn't found by static middleware
-  else if (ext && req.path.indexOf('/api') !== 0 && req.path.indexOf('/auth') !== 0) {
-    return res.status(404).send('File not found');
-  }
-  // Let the remaining middleware handle API routes
-  else {
+});
+
+// Catch-all route handler for HTML pages
+app.get('*.html', (req, res, next) => {
+  // Skip login page - always accessible
+  if (req.path === '/login.html') {
     return next();
   }
+  
+  // Check authentication for other HTML pages
+  if (!req.isAuthenticated()) {
+    return res.redirect('/login.html');
+  }
+  
+  // Continue to serve the file if authenticated
+  next();
+});
+
+// Handle 404 for non-existent files or routes
+app.use((req, res) => {
+  res.status(404).send('Not found');
 });
 
 // Error handling middleware
