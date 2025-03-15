@@ -1,10 +1,10 @@
+// src/routes/allowance.js
+
 const express = require('express');
 const {
-  processAllowance
-} = require('../controllers/allowance');
-const {
+  processAllowance,
   calculateInterest
-} = require('../controllers/interest');
+} = require('../controllers/allowance');
 
 const router = express.Router();
 

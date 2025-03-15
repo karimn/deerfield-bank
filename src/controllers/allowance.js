@@ -1,3 +1,5 @@
+// src/controllers/allowance.js
+
 const User = require('../models/User');
 const Account = require('../models/Account');
 const Transaction = require('../models/Transaction');
