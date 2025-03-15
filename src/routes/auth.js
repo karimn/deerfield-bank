@@ -13,10 +13,17 @@ router.get('/google',
 // @desc    Google auth callback
 // @access  Public
 router.get('/google/callback', 
-  passport.authenticate('google', { failureRedirect: '/login.html' }),
+  passport.authenticate('google', { 
+    failureRedirect: '/auth-failed.html',
+    failureMessage: true 
+  }),
   (req, res) => {
-    // Successful authentication - redirect to dashboard.html (not dashboard)
-    res.redirect('/dashboard.html');
+    // Successful authentication - redirect based on user role
+    if (req.user.role === 'parent') {
+      res.redirect('/parent-dashboard.html');
+    } else {
+      res.redirect('/dashboard.html');
+    }
   }
 );
 

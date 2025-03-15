@@ -49,18 +49,22 @@ document.addEventListener('DOMContentLoaded', function() {
         // Set current user
         currentUser = authData.user;
         
-        // Update user info display
+// This is the code to update the dropdown menu in all JavaScript files
+// Use this in profile.js, child-detail.js and any other place where the dropdown is generated
+
+        // Update user info display with correct dashboard link
         userInfoEl.innerHTML = `
-          <div class="dropdown">
+        <div class="dropdown">
             <button class="btn btn-outline-primary dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown">
-              ${currentUser.name}
+            ${currentUser.name}
             </button>
             <ul class="dropdown-menu dropdown-menu-end">
-              <li><a class="dropdown-item" href="/profile.html">Profile</a></li>
-              <li><hr class="dropdown-divider"></li>
-              <li><a class="dropdown-item" href="/auth/logout" id="logout-link">Logout</a></li>
+            <li><a class="dropdown-item" href="${currentUser.role === 'parent' ? '/parent-dashboard.html' : '/dashboard.html'}">Dashboard</a></li>
+            <li><a class="dropdown-item" href="/profile.html">Profile</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="/auth/logout" id="logout-link">Logout</a></li>
             </ul>
-          </div>
+        </div>
         `;
         
         // 2. Get accounts for the user

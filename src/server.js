@@ -52,8 +52,6 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Important: Serve static files from the correct directory
-// In your project, static files are in src/public
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Auth routes
@@ -67,9 +65,14 @@ app.use('/api/subscriptions', ensureAuth, require('./routes/subscriptions'));
 app.use('/api', ensureAuth, require('./routes/allowance'));
 
 // Redirect root to login or dashboard based on auth status
+// Redirect root to login or dashboard based on auth status and role
 app.get('/', (req, res) => {
   if (req.isAuthenticated()) {
-    res.redirect('/dashboard.html');
+    if (req.user.role === 'parent') {
+      res.redirect('/parent-dashboard.html');
+    } else {
+      res.redirect('/dashboard.html');
+    }
   } else {
     res.redirect('/login.html');
   }

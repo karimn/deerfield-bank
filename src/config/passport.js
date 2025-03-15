@@ -13,17 +13,16 @@ module.exports = function() {
       console.log('Google auth callback triggered');
       console.log('Profile:', profile.displayName, profile.emails[0].value);
       
-      // Check if user already exists
+      // Check if user already exists with Google ID
       let user = await User.findOne({ googleId: profile.id });
       
       if (user) {
-        // User exists, return the user
-        console.log('Existing user found:', user.name);
+        // User exists with this Google ID, return the user
+        console.log('Existing user found with Google ID:', user.name);
         return done(null, user);
       }
       
-      // If we don't have a user with this Google ID
-      // We need to determine if this is a new signup or an existing email
+      // If no user with this Google ID, check if a user exists with the email
       user = await User.findOne({ email: profile.emails[0].value });
       
       if (user) {
@@ -34,16 +33,11 @@ module.exports = function() {
         return done(null, user);
       }
       
-      // Create a new user (will need admin approval to set role)
-      console.log('Creating new user');
-      const newUser = await User.create({
-        name: profile.displayName,
-        email: profile.emails[0].value,
-        googleId: profile.id,
-        role: 'child'  // Default to child, admin can change later
-      });
+      // No user found with this Google ID or email
+      // Instead of creating a new user, we'll return an error
+      console.log('No existing account found for this Google user');
+      return done(null, false, { message: 'No account exists for this email. Please contact an administrator to create an account.' });
       
-      return done(null, newUser);
     } catch (err) {
       console.error('Error in Google strategy:', err);
       return done(err, null);

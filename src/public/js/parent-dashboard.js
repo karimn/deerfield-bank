@@ -41,6 +41,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentUser = null;
     let pendingTransactions = [];
     let currentTransactionId = null;
+    let currentEditChildId = null; // For tracking when editing an existing child
+
     
     // Initialize the application
     init();
@@ -68,19 +70,22 @@ document.addEventListener('DOMContentLoaded', function() {
         // Set current user
         currentUser = authData.user;
         
-        // Update user info display
+        // This is the code to update the dropdown menu in all JavaScript files
+        // Use this in profile.js, child-detail.js and any other place where the dropdown is generated
+
+        // Update user info display with correct dashboard link
         userInfoEl.innerHTML = `
-          <div class="dropdown">
+        <div class="dropdown">
             <button class="btn btn-outline-primary dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown">
-              ${currentUser.name}
+            ${currentUser.name}
             </button>
             <ul class="dropdown-menu dropdown-menu-end">
-              <li><a class="dropdown-item" href="/dashboard.html">My Dashboard</a></li>
-              <li><a class="dropdown-item" href="/profile.html">Profile</a></li>
-              <li><hr class="dropdown-divider"></li>
-              <li><a class="dropdown-item" href="/auth/logout" id="logout-link">Logout</a></li>
+            <li><a class="dropdown-item" href="${currentUser.role === 'parent' ? '/parent-dashboard.html' : '/dashboard.html'}">Dashboard</a></li>
+            <li><a class="dropdown-item" href="/profile.html">Profile</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="/auth/logout" id="logout-link">Logout</a></li>
             </ul>
-          </div>
+        </div>
         `;
         
         // 2. Load pending transactions
@@ -171,78 +176,248 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Load children
-    async function loadChildren() {
-      try {
-        // Get all users
-        const response = await fetch(`${API_URL}/users`);
-        const data = await response.json();
+// Updated loadChildren function
+async function loadChildren() {
+    try {
+      // Get all users
+      const response = await fetch(`${API_URL}/users`);
+      const data = await response.json();
+      
+      // Filter for children
+      const children = data.data.filter(user => user.role === 'child');
+      
+      if (children.length === 0) {
+        childrenContainerEl.innerHTML = `
+          <div class="col-12 text-center py-4">
+            <p class="mb-0">No children found. Add your first child to get started.</p>
+          </div>
+        `;
+        return;
+      }
+      
+      // Get accounts for each child
+      const childrenWithAccounts = await Promise.all(children.map(async (child) => {
+        const accountsResponse = await fetch(`${API_URL}/accounts?userId=${child._id}`);
+        const accountsData = await accountsResponse.json();
+        return {
+          ...child,
+          accounts: accountsData.data
+        };
+      }));
+      
+      // Display children
+      childrenContainerEl.innerHTML = childrenWithAccounts.map(child => {
+        // Calculate total balance across all accounts
+        const totalBalance = child.accounts.reduce((sum, account) => sum + account.balance, 0);
         
-        // Filter for children
-        const children = data.data.filter(user => user.role === 'child');
-        
-        if (children.length === 0) {
-          childrenContainerEl.innerHTML = `
-            <div class="col-12 text-center py-4">
-              <p class="mb-0">No children found. Add your first child to get started.</p>
-            </div>
-          `;
-          return;
-        }
-        
-        // Get accounts for each child
-        const childrenWithAccounts = await Promise.all(children.map(async (child) => {
-          const accountsResponse = await fetch(`${API_URL}/accounts?userId=${child._id}`);
-          const accountsData = await accountsResponse.json();
-          return {
-            ...child,
-            accounts: accountsData.data
-          };
-        }));
-        
-        // Display children
-        childrenContainerEl.innerHTML = childrenWithAccounts.map(child => {
-          // Calculate total balance across all accounts
-          const totalBalance = child.accounts.reduce((sum, account) => sum + account.balance, 0);
-          
-          return `
-            <div class="col-md-6 mb-4">
-              <div class="card child-card h-100">
-                <div class="card-body">
-                  <h5 class="card-title">${child.name}</h5>
-                  <h6 class="card-subtitle mb-2 text-muted">${child.email}</h6>
-                  <p class="card-text">Total Balance: ${formatCurrency(totalBalance)}</p>
-                  <div class="d-flex flex-wrap gap-2 mb-3">
-                    ${child.accounts.map(account => `
-                      <span class="badge bg-light text-dark border">
-                        ${account.type}: ${formatCurrency(account.balance)}
-                      </span>
-                    `).join('')}
-                  </div>
+        return `
+          <div class="col-md-6 mb-4">
+            <div class="card child-card h-100">
+              <div class="card-body">
+                <h5 class="card-title">${child.name}</h5>
+                <h6 class="card-subtitle mb-2 text-muted">${child.email}</h6>
+                <p class="card-text">Total Balance: ${formatCurrency(totalBalance)}</p>
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                  ${child.accounts.map(account => `
+                    <span class="badge bg-light text-dark border">
+                      ${account.type}: ${formatCurrency(account.balance)}
+                    </span>
+                  `).join('')}
                 </div>
-                <div class="card-footer bg-transparent">
-                  <div class="btn-group w-100" role="group">
-                    <button type="button" class="btn btn-outline-primary btn-sm edit-child" data-id="${child._id}">
-                      Edit
-                    </button>
-                    <button type="button" class="btn btn-outline-success btn-sm view-child" data-id="${child._id}">
-                      View Details
-                    </button>
-                  </div>
+              </div>
+              <div class="card-footer bg-transparent">
+                <div class="btn-group w-100" role="group">
+                  <button type="button" class="btn btn-outline-primary btn-sm edit-child" data-id="${child._id}">
+                    Edit
+                  </button>
+                  <button type="button" class="btn btn-outline-success btn-sm view-child" data-id="${child._id}">
+                    View Details
+                  </button>
                 </div>
               </div>
             </div>
-          `;
-        }).join('');
-        
-      } catch (error) {
-        console.error('Error loading children:', error);
-        childrenContainerEl.innerHTML = `
-          <div class="col-12 text-center py-4">
-            <p class="text-danger mb-0">Error loading children</p>
           </div>
         `;
-      }
+      }).join('');
+      
+      // Add event listeners to the buttons
+      addChildButtonEventListeners();
+      
+    } catch (error) {
+      console.error('Error loading children:', error);
+      childrenContainerEl.innerHTML = `
+        <div class="col-12 text-center py-4">
+          <p class="text-danger mb-0">Error loading children</p>
+        </div>
+      `;
     }
+  }
+   
+    // Add this to the setupEventListeners function in parent-dashboard.js
+// after the loadChildren() function has completed successfully
+
+// Add event listeners to Edit and View Details buttons
+function addChildButtonEventListeners() {
+    // View Details buttons
+    document.querySelectorAll('.view-child').forEach(button => {
+      button.addEventListener('click', () => {
+        const childId = button.getAttribute('data-id');
+        // Navigate to child details page with the child ID
+        window.location.href = `/child-detail.html?id=${childId}`;
+      });
+    });
+    
+    // Edit buttons
+    document.querySelectorAll('.edit-child').forEach(button => {
+      button.addEventListener('click', () => {
+        const childId = button.getAttribute('data-id');
+        // For now, let's just find the child and show the edit modal
+        editChild(childId);
+      });
+    });
+  }
+  
+  // Add this function to handle editing a child
+  async function editChild(childId) {
+    try {
+      // Find the child data from the list of children
+      const response = await fetch(`${API_URL}/users/${childId}`);
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to load child data');
+      }
+      
+      const child = data.data;
+      
+      // Pre-fill the child form
+      childNameEl.value = child.name;
+      childEmailEl.value = child.email;
+      createAccountsEl.checked = false; // Don't create new accounts by default when editing
+      
+      // Store the childId for the save function
+      currentEditChildId = childId;
+      
+      // Change the modal title to indicate editing
+      document.querySelector('#addChildModal .modal-title').textContent = 'Edit Child';
+      
+      // Change the save button text
+      saveChildBtn.textContent = 'Update';
+      
+      // Show the modal
+      addChildModal.show();
+    } catch (error) {
+      console.error('Error preparing child edit:', error);
+      alert(`Error: ${error.message}`);
+    }
+  }
+  
+  // Modify the saveChild function to handle both creating and updating
+  async function saveChild() {
+    try {
+      const name = childNameEl.value;
+      const email = childEmailEl.value;
+      const createAccounts = createAccountsEl.checked;
+      const initialBalance = parseFloat(initialBalanceEl.value) || 0;
+      
+      if (!name || !email) {
+        alert('Please fill out all required fields');
+        return;
+      }
+      
+      // Check if we're editing an existing child or creating a new one
+      if (currentEditChildId) {
+        // Update existing child
+        const userResponse = await fetch(`${API_URL}/users/${currentEditChildId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            name,
+            email
+          })
+        });
+        
+        const userData = await userResponse.json();
+        
+        if (!userData.success) {
+          throw new Error(userData.error || 'Failed to update child');
+        }
+        
+        // Reset currentEditChildId
+        currentEditChildId = null;
+        
+        // Reset modal title and button text
+        document.querySelector('#addChildModal .modal-title').textContent = 'Add New Child';
+        saveChildBtn.textContent = 'Save';
+        
+        // Close modal
+        addChildModal.hide();
+        
+        // Refresh children list
+        await loadChildren();
+        
+        // Success message
+        alert(`Child ${name} updated successfully!`);
+      } else {
+        // Create new child user
+        const userResponse = await fetch(`${API_URL}/users`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            name,
+            email,
+            role: 'child',
+            parent: currentUser.id
+          })
+        });
+        
+        const userData = await userResponse.json();
+        
+        if (!userData.success) {
+          throw new Error(userData.error || 'Failed to create user');
+        }
+        
+        const childId = userData.data._id;
+        
+        // Create accounts if selected
+        if (createAccounts) {
+          const accountTypes = ['spending', 'saving', 'donation'];
+          
+          for (const type of accountTypes) {
+            await fetch(`${API_URL}/accounts`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                name: capitalizeFirstLetter(type),
+                type,
+                balance: initialBalance,
+                interestRate: type === 'saving' ? 5 : 0, // 5% interest for saving account
+                owner: childId
+              })
+            });
+          }
+        }
+        
+        // Close modal
+        addChildModal.hide();
+        
+        // Refresh children list
+        await loadChildren();
+        
+        // Success message
+        alert(`Child ${name} added successfully!`);
+      }
+    } catch (error) {
+      console.error('Error saving child:', error);
+      alert(`Error: ${error.message}`);
+    }
+  }
     
     // Show transaction details
     function showTransactionDetails(transactionId) {
