@@ -62,6 +62,7 @@ app.use('/api/users', ensureAuth, require('./routes/users'));
 app.use('/api/accounts', ensureAuth, require('./routes/accounts'));
 app.use('/api/transactions', ensureAuth, require('./routes/transactions'));
 app.use('/api/subscriptions', ensureAuth, require('./routes/subscriptions'));
+app.use('/api/recurring', ensureAuth, require('./routes/recurring'));
 app.use('/api', ensureAuth, require('./routes/allowance'));
 
 // Redirect root to login or dashboard based on auth status

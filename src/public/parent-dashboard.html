@@ -108,6 +108,30 @@
         </div>
         
         <div class="card mt-4">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Recurring Transactions</h5>
+            <button class="btn btn-sm btn-outline-primary" id="refresh-recurring-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-clockwise" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
+                <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+              </svg>
+            </button>
+          </div>
+          <div class="card-body p-0">
+            <div id="recurring-list" class="list-group list-group-flush">
+              <div class="text-center py-3">
+                <div class="spinner-border text-primary" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card-footer">
+            <button class="btn btn-sm btn-primary" id="add-recurring-btn">Add Recurring Transaction</button>
+          </div>
+        </div>
+        
+        <div class="card mt-4">
           <div class="card-header">
             <h5 class="mb-0">Allowance Settings</h5>
           </div>
@@ -206,6 +230,100 @@
           <div class="modal-footer">
             <button type="button" class="btn btn-danger" id="reject-transaction-btn">Reject</button>
             <button type="button" class="btn btn-success" id="approve-transaction-btn">Approve</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recurring Transaction Modal -->
+    <div class="modal fade" id="recurringTransactionModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="recurring-modal-title">Add Recurring Transaction</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <form id="recurring-form">
+              <input type="hidden" id="recurring-id">
+              <div class="mb-3">
+                <label for="recurring-name" class="form-label">Name</label>
+                <input type="text" class="form-control" id="recurring-name" required>
+              </div>
+              <div class="mb-3">
+                <label for="recurring-description" class="form-label">Description</label>
+                <input type="text" class="form-control" id="recurring-description">
+              </div>
+              <div class="mb-3">
+                <label for="recurring-amount" class="form-label">Amount</label>
+                <div class="input-group">
+                  <span class="input-group-text">$</span>
+                  <input type="number" class="form-control" id="recurring-amount" step="0.01" min="0.01" required>
+                </div>
+              </div>
+              <div class="mb-3">
+                <label for="recurring-type" class="form-label">Type</label>
+                <select class="form-select" id="recurring-type" required>
+                  <option value="allowance">Allowance</option>
+                  <option value="subscription">Subscription</option>
+                  <option value="interest">Interest</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label for="recurring-frequency" class="form-label">Frequency</label>
+                <select class="form-select" id="recurring-frequency" required>
+                  <option value="daily">Daily</option>
+                  <option value="weekly" selected>Weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label for="recurring-child" class="form-label">Child</label>
+                <select class="form-select" id="recurring-child" required>
+                  <!-- Will be populated by JavaScript -->
+                </select>
+              </div>
+              <div class="mb-3">
+                <label for="recurring-account" class="form-label">Account</label>
+                <select class="form-select" id="recurring-account" required>
+                  <!-- Will be populated by JavaScript -->
+                </select>
+              </div>
+              <div id="distribution-container" class="mb-3 d-none">
+                <label class="form-label">Distribution (Allowance only)</label>
+                <div class="input-group mb-2">
+                  <span class="input-group-text">Spending</span>
+                  <input type="number" class="form-control" id="recurring-spending" value="34" min="0" max="100">
+                  <span class="input-group-text">%</span>
+                </div>
+                <div class="input-group mb-2">
+                  <span class="input-group-text">Saving</span>
+                  <input type="number" class="form-control" id="recurring-saving" value="33" min="0" max="100">
+                  <span class="input-group-text">%</span>
+                </div>
+                <div class="input-group">
+                  <span class="input-group-text">Donation</span>
+                  <input type="number" class="form-control" id="recurring-donation" value="33" min="0" max="100">
+                  <span class="input-group-text">%</span>
+                </div>
+                <div class="form-text" id="recurring-distribution-total">Total: 100%</div>
+              </div>
+              <div class="mb-3">
+                <label for="recurring-next-date" class="form-label">Next Date</label>
+                <input type="date" class="form-control" id="recurring-next-date" required>
+              </div>
+              <div class="mb-3 form-check">
+                <input type="checkbox" class="form-check-input" id="recurring-active" checked>
+                <label class="form-check-label" for="recurring-active">Active</label>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-danger d-none" id="delete-recurring-btn">Delete</button>
+            <button type="button" class="btn btn-primary" id="save-recurring-btn">Save</button>
           </div>
         </div>
       </div>

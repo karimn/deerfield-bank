@@ -7,10 +7,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const approvalsTableEl = document.getElementById('approvals-table');
     const approvalsBadgeEl = document.getElementById('approvals-badge');
     const childrenContainerEl = document.getElementById('children-container');
+    const recurringListEl = document.getElementById('recurring-list');
     
     // Modal elements
     const addChildModal = new bootstrap.Modal(document.getElementById('addChildModal'));
     const approvalModal = new bootstrap.Modal(document.getElementById('approvalModal'));
+    const recurringTransactionModal = new bootstrap.Modal(document.getElementById('recurringTransactionModal'));
     const approvalModalBodyEl = document.getElementById('approval-modal-body');
     
     // Form elements
@@ -20,6 +22,25 @@ document.addEventListener('DOMContentLoaded', function() {
     const createAccountsEl = document.getElementById('create-accounts');
     const initialBalanceEl = document.getElementById('initial-balance');
     
+    // Recurring transaction form elements
+    const recurringFormEl = document.getElementById('recurring-form');
+    const recurringIdEl = document.getElementById('recurring-id');
+    const recurringNameEl = document.getElementById('recurring-name');
+    const recurringDescriptionEl = document.getElementById('recurring-description');
+    const recurringAmountEl = document.getElementById('recurring-amount');
+    const recurringTypeEl = document.getElementById('recurring-type');
+    const recurringFrequencyEl = document.getElementById('recurring-frequency');
+    const recurringChildEl = document.getElementById('recurring-child');
+    const recurringAccountEl = document.getElementById('recurring-account');
+    const recurringSpendingEl = document.getElementById('recurring-spending');
+    const recurringSavingEl = document.getElementById('recurring-saving');
+    const recurringDonationEl = document.getElementById('recurring-donation');
+    const recurringDistributionTotalEl = document.getElementById('recurring-distribution-total');
+    const recurringNextDateEl = document.getElementById('recurring-next-date');
+    const recurringActiveEl = document.getElementById('recurring-active');
+    const recurringModalTitleEl = document.getElementById('recurring-modal-title');
+    const distributionContainerEl = document.getElementById('distribution-container');
+    
     // Button elements
     const addChildBtn = document.getElementById('add-child-btn');
     const saveChildBtn = document.getElementById('save-child-btn');
@@ -28,6 +49,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const processSubscriptionsBtn = document.getElementById('process-subscriptions-btn');
     const approveTransactionBtn = document.getElementById('approve-transaction-btn');
     const rejectTransactionBtn = document.getElementById('reject-transaction-btn');
+    const refreshRecurringBtn = document.getElementById('refresh-recurring-btn');
+    const addRecurringBtn = document.getElementById('add-recurring-btn');
+    const saveRecurringBtn = document.getElementById('save-recurring-btn');
+    const deleteRecurringBtn = document.getElementById('delete-recurring-btn');
     
     // Allowance settings elements
     const allowanceSettingsFormEl = document.getElementById('allowance-settings-form');
@@ -42,6 +67,9 @@ document.addEventListener('DOMContentLoaded', function() {
     let pendingTransactions = [];
     let currentTransactionId = null;
     let currentEditChildId = null; // For tracking when editing an existing child
+    let childrenData = []; // Store children data for reference
+    let accountsData = []; // Store accounts data for reference
+    let currentEditRecurringId = null; // For tracking when editing recurring transactions
 
     
     // Initialize the application
@@ -94,10 +122,13 @@ document.addEventListener('DOMContentLoaded', function() {
         // 3. Load children
         await loadChildren();
         
-        // 4. Set up event listeners
+        // 4. Load recurring transactions
+        await loadRecurringTransactions();
+        
+        // 5. Set up event listeners
         setupEventListeners();
         
-        // 5. Update distribution total
+        // 6. Update distribution total
         updateDistributionTotal();
         
       } catch (error) {
@@ -184,9 +215,9 @@ async function loadChildren() {
       const data = await response.json();
       
       // Filter for children
-      const children = data.data.filter(user => user.role === 'child');
+      childrenData = data.data.filter(user => user.role === 'child');
       
-      if (children.length === 0) {
+      if (childrenData.length === 0) {
         childrenContainerEl.innerHTML = `
           <div class="col-12 text-center py-4">
             <p class="mb-0">No children found. Add your first child to get started.</p>
@@ -196,7 +227,7 @@ async function loadChildren() {
       }
       
       // Get accounts for each child
-      const childrenWithAccounts = await Promise.all(children.map(async (child) => {
+      const childrenWithAccounts = await Promise.all(childrenData.map(async (child) => {
         const accountsResponse = await fetch(`${API_URL}/accounts?userId=${child._id}`);
         const accountsData = await accountsResponse.json();
         return {
@@ -248,6 +279,93 @@ async function loadChildren() {
       childrenContainerEl.innerHTML = `
         <div class="col-12 text-center py-4">
           <p class="text-danger mb-0">Error loading children</p>
+        </div>
+      `;
+    }
+  }
+  
+  // Load recurring transactions
+  async function loadRecurringTransactions() {
+    try {
+      const response = await fetch(`${API_URL}/recurring`);
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to load recurring transactions');
+      }
+      
+      const recurringTransactions = data.data;
+      
+      if (recurringTransactions.length === 0) {
+        recurringListEl.innerHTML = `
+          <div class="text-center py-3">
+            <p class="mb-0">No recurring transactions found</p>
+          </div>
+        `;
+        return;
+      }
+      
+      // Group by type for better organization
+      const groupedTransactions = {
+        allowance: recurringTransactions.filter(item => item.type === 'allowance'),
+        subscription: recurringTransactions.filter(item => item.type === 'subscription'),
+        interest: recurringTransactions.filter(item => item.type === 'interest'),
+        other: recurringTransactions.filter(item => item.type === 'other')
+      };
+      
+      // Create list items
+      let recurringHtml = '';
+      
+      // Add each group if it has items
+      for (const [type, items] of Object.entries(groupedTransactions)) {
+        if (items.length > 0) {
+          // Add group header
+          recurringHtml += `
+            <div class="list-group-item list-group-item-action active">
+              ${capitalizeFirstLetter(type)} (${items.length})
+            </div>
+          `;
+          
+          // Add items in this group
+          items.forEach(item => {
+            const nextDate = new Date(item.nextDate).toLocaleDateString();
+            const amount = formatCurrency(item.amount);
+            const childName = item.user?.name || 'Unknown';
+            const accountName = item.account?.name || 'Unknown';
+            const badgeClass = item.active ? 'bg-success' : 'bg-secondary';
+            const statusText = item.active ? 'Active' : 'Inactive';
+            
+            recurringHtml += `
+              <button class="list-group-item list-group-item-action recurring-item" data-id="${item._id}">
+                <div class="d-flex w-100 justify-content-between">
+                  <h6 class="mb-1">${item.name}</h6>
+                  <span class="badge ${badgeClass}">${statusText}</span>
+                </div>
+                <p class="mb-1">${amount} · ${getFrequencyText(item.frequency)} · Next: ${nextDate}</p>
+                <small class="text-muted">For: ${childName} · Account: ${accountName}</small>
+              </button>
+            `;
+          });
+        }
+      }
+      
+      recurringListEl.innerHTML = recurringHtml;
+      
+      // Add event listeners to recurring item buttons
+      document.querySelectorAll('.recurring-item').forEach(button => {
+        button.addEventListener('click', (e) => {
+          const id = e.target.closest('.recurring-item').dataset.id;
+          showRecurringTransactionDetails(id);
+        });
+      });
+      
+    } catch (error) {
+      console.error('Error loading recurring transactions:', error);
+      recurringListEl.innerHTML = `
+        <div class="text-center py-3">
+          <div class="alert alert-danger mb-0">
+            Error loading recurring transactions. Please try again later.
+          </div>
         </div>
       `;
     }
@@ -511,6 +629,51 @@ function addChildButtonEventListeners() {
       spendingPercentEl.addEventListener('input', updateDistributionTotal);
       savingPercentEl.addEventListener('input', updateDistributionTotal);
       donationPercentEl.addEventListener('input', updateDistributionTotal);
+      
+      // Recurring transactions buttons
+      refreshRecurringBtn.addEventListener('click', loadRecurringTransactions);
+      
+      addRecurringBtn.addEventListener('click', () => {
+        // Reset the form and prepare for new transaction
+        recurringFormEl.reset();
+        recurringIdEl.value = '';
+        currentEditRecurringId = null;
+        recurringModalTitleEl.textContent = 'Add Recurring Transaction';
+        deleteRecurringBtn.classList.add('d-none');
+        
+        // Set default values
+        const today = new Date();
+        recurringNextDateEl.value = formatDateForInput(today);
+        recurringActiveEl.checked = true;
+        
+        // Show distribution fields only for allowance type
+        recurringTypeEl.value = 'allowance';
+        toggleDistributionFields();
+        updateRecurringDistributionTotal();
+        
+        // Populate children dropdown
+        populateChildrenDropdown();
+        
+        // Show modal
+        recurringTransactionModal.show();
+      });
+      
+      // Recurring transaction type change event
+      recurringTypeEl.addEventListener('change', toggleDistributionFields);
+      
+      // Recurring child change event
+      recurringChildEl.addEventListener('change', () => loadChildAccounts(recurringChildEl.value));
+      
+      // Recurring distribution fields change events
+      recurringSpendingEl.addEventListener('input', updateRecurringDistributionTotal);
+      recurringSavingEl.addEventListener('input', updateRecurringDistributionTotal);
+      recurringDonationEl.addEventListener('input', updateRecurringDistributionTotal);
+      
+      // Save recurring transaction button
+      saveRecurringBtn.addEventListener('click', saveRecurringTransaction);
+      
+      // Delete recurring transaction button
+      deleteRecurringBtn.addEventListener('click', deleteRecurringTransaction);
     }
     
     // Update distribution total
@@ -674,22 +837,288 @@ function addChildButtonEventListeners() {
           return;
         }
         
-        const response = await fetch(`${API_URL}/subscriptions/process`, {
+        const response = await fetch(`${API_URL}/recurring/process`, {
           method: 'POST'
         });
         
         const data = await response.json();
         
         if (data.success) {
-          alert(`Subscriptions processed successfully! Created ${data.count} transactions.`);
-          // Refresh the page to show updated balances
-          location.reload();
+          alert(`Processed ${data.processed} recurring transactions with ${data.errors} errors.`);
+          
+          // Refresh recurring transactions to show updated next dates
+          await loadRecurringTransactions();
+          
         } else {
           throw new Error(data.error || 'Failed to process subscriptions');
         }
         
       } catch (error) {
         console.error('Error processing subscriptions:', error);
+        alert(`Error: ${error.message}`);
+      }
+    }
+    
+    // Toggle distribution fields based on transaction type
+    function toggleDistributionFields() {
+      if (recurringTypeEl.value === 'allowance') {
+        distributionContainerEl.classList.remove('d-none');
+      } else {
+        distributionContainerEl.classList.add('d-none');
+      }
+    }
+    
+    // Update recurring distribution total
+    function updateRecurringDistributionTotal() {
+      const spendingPercent = parseInt(recurringSpendingEl.value) || 0;
+      const savingPercent = parseInt(recurringSavingEl.value) || 0;
+      const donationPercent = parseInt(recurringDonationEl.value) || 0;
+      
+      const total = spendingPercent + savingPercent + donationPercent;
+      
+      recurringDistributionTotalEl.textContent = `Total: ${total}%`;
+      
+      if (total !== 100) {
+        recurringDistributionTotalEl.classList.add('text-danger');
+      } else {
+        recurringDistributionTotalEl.classList.remove('text-danger');
+      }
+    }
+    
+    // Populate children dropdown for recurring transactions
+    function populateChildrenDropdown() {
+      // Clear existing options
+      recurringChildEl.innerHTML = '';
+      
+      // Add options for each child
+      childrenData.forEach(child => {
+        const option = document.createElement('option');
+        option.value = child._id;
+        option.textContent = child.name;
+        recurringChildEl.appendChild(option);
+      });
+      
+      // If at least one child exists, load their accounts
+      if (childrenData.length > 0) {
+        loadChildAccounts(childrenData[0]._id);
+      }
+    }
+    
+    // Load child accounts for recurring transactions
+    async function loadChildAccounts(childId) {
+      try {
+        const response = await fetch(`${API_URL}/accounts?userId=${childId}`);
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to load accounts');
+        }
+        
+        accountsData = data.data;
+        
+        // Clear existing options
+        recurringAccountEl.innerHTML = '';
+        
+        if (accountsData.length === 0) {
+          const option = document.createElement('option');
+          option.textContent = 'No accounts available';
+          recurringAccountEl.appendChild(option);
+          recurringAccountEl.disabled = true;
+          return;
+        }
+        
+        recurringAccountEl.disabled = false;
+        
+        // Add options for each account
+        accountsData.forEach(account => {
+          const option = document.createElement('option');
+          option.value = account._id;
+          option.textContent = `${account.name} (${capitalizeFirstLetter(account.type)})`;
+          recurringAccountEl.appendChild(option);
+        });
+        
+      } catch (error) {
+        console.error('Error loading child accounts:', error);
+        recurringAccountEl.innerHTML = '<option>Error loading accounts</option>';
+        recurringAccountEl.disabled = true;
+      }
+    }
+    
+    // Show recurring transaction details for edit
+    async function showRecurringTransactionDetails(id) {
+      try {
+        const response = await fetch(`${API_URL}/recurring/${id}`);
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to load recurring transaction');
+        }
+        
+        const transaction = data.data;
+        currentEditRecurringId = id;
+        
+        // Set form values
+        recurringIdEl.value = id;
+        recurringNameEl.value = transaction.name;
+        recurringDescriptionEl.value = transaction.description || '';
+        recurringAmountEl.value = transaction.amount.toFixed(2);
+        recurringTypeEl.value = transaction.type;
+        recurringFrequencyEl.value = transaction.frequency;
+        recurringActiveEl.checked = transaction.active;
+        recurringNextDateEl.value = formatDateForInput(transaction.nextDate);
+        
+        // Show or hide distribution fields
+        toggleDistributionFields();
+        
+        // For allowance type, set distribution values
+        if (transaction.type === 'allowance' && transaction.distribution) {
+          recurringSpendingEl.value = transaction.distribution.spending || 0;
+          recurringSavingEl.value = transaction.distribution.saving || 0;
+          recurringDonationEl.value = transaction.distribution.donation || 0;
+          updateRecurringDistributionTotal();
+        }
+        
+        // Populate children dropdown and select the right child
+        await populateChildrenDropdown();
+        recurringChildEl.value = transaction.user._id;
+        
+        // Load accounts for this child and select the right account
+        await loadChildAccounts(transaction.user._id);
+        recurringAccountEl.value = transaction.account._id;
+        
+        // Update modal title and show delete button
+        recurringModalTitleEl.textContent = 'Edit Recurring Transaction';
+        deleteRecurringBtn.classList.remove('d-none');
+        
+        // Show modal
+        recurringTransactionModal.show();
+        
+      } catch (error) {
+        console.error('Error loading recurring transaction details:', error);
+        alert('Error loading transaction details: ' + error.message);
+      }
+    }
+    
+    // Save recurring transaction
+    async function saveRecurringTransaction() {
+      try {
+        // Validate form
+        if (!recurringFormEl.checkValidity()) {
+          recurringFormEl.reportValidity();
+          return;
+        }
+        
+        // For allowance type, validate distribution
+        if (recurringTypeEl.value === 'allowance') {
+          const spendingPercent = parseInt(recurringSpendingEl.value) || 0;
+          const savingPercent = parseInt(recurringSavingEl.value) || 0;
+          const donationPercent = parseInt(recurringDonationEl.value) || 0;
+          
+          const total = spendingPercent + savingPercent + donationPercent;
+          
+          if (total !== 100) {
+            alert('Distribution percentages must add up to 100%');
+            return;
+          }
+        }
+        
+        // Collect form data
+        const transactionData = {
+          name: recurringNameEl.value,
+          description: recurringDescriptionEl.value,
+          amount: parseFloat(recurringAmountEl.value),
+          type: recurringTypeEl.value,
+          frequency: recurringFrequencyEl.value,
+          user: recurringChildEl.value,
+          account: recurringAccountEl.value,
+          nextDate: recurringNextDateEl.value,
+          active: recurringActiveEl.checked
+        };
+        
+        // Add distribution data for allowance type
+        if (recurringTypeEl.value === 'allowance') {
+          transactionData.distribution = {
+            spending: parseInt(recurringSpendingEl.value) || 0,
+            saving: parseInt(recurringSavingEl.value) || 0,
+            donation: parseInt(recurringDonationEl.value) || 0
+          };
+        }
+        
+        // Determine if this is a create or update operation
+        const isUpdate = currentEditRecurringId !== null;
+        const url = isUpdate ? `${API_URL}/recurring/${currentEditRecurringId}` : `${API_URL}/recurring`;
+        const method = isUpdate ? 'PUT' : 'POST';
+        
+        // Send to API
+        const response = await fetch(url, {
+          method: method,
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(transactionData)
+        });
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to save recurring transaction');
+        }
+        
+        // Close modal
+        recurringTransactionModal.hide();
+        
+        // Refresh recurring transactions
+        await loadRecurringTransactions();
+        
+        // Reset edit state
+        currentEditRecurringId = null;
+        
+        // Success message
+        alert(`Recurring transaction ${isUpdate ? 'updated' : 'created'} successfully!`);
+        
+      } catch (error) {
+        console.error('Error saving recurring transaction:', error);
+        alert(`Error: ${error.message}`);
+      }
+    }
+    
+    // Delete recurring transaction
+    async function deleteRecurringTransaction() {
+      try {
+        if (!currentEditRecurringId) {
+          throw new Error('No transaction selected for deletion');
+        }
+        
+        // Confirm deletion
+        if (!confirm('Are you sure you want to delete this recurring transaction? This action cannot be undone.')) {
+          return;
+        }
+        
+        // Send to API
+        const response = await fetch(`${API_URL}/recurring/${currentEditRecurringId}`, {
+          method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to delete recurring transaction');
+        }
+        
+        // Close modal
+        recurringTransactionModal.hide();
+        
+        // Refresh recurring transactions
+        await loadRecurringTransactions();
+        
+        // Reset edit state
+        currentEditRecurringId = null;
+        
+        // Success message
+        alert('Recurring transaction deleted successfully!');
+        
+      } catch (error) {
+        console.error('Error deleting recurring transaction:', error);
         alert(`Error: ${error.message}`);
       }
     }
@@ -790,5 +1219,30 @@ function addChildButtonEventListeners() {
     // Capitalize first letter
     function capitalizeFirstLetter(string) {
       return string.charAt(0).toUpperCase() + string.slice(1);
+    }
+    
+    // Format date for input field (YYYY-MM-DD)
+    function formatDateForInput(dateString) {
+      const date = new Date(dateString);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+    
+    // Get frequency text
+    function getFrequencyText(frequency) {
+      switch (frequency) {
+        case 'daily':
+          return 'Daily';
+        case 'weekly':
+          return 'Weekly';
+        case 'monthly':
+          return 'Monthly';
+        case 'yearly':
+          return 'Yearly';
+        default:
+          return 'Custom';
+      }
     }
   });

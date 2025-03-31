@@ -674,7 +674,21 @@ document.addEventListener('DOMContentLoaded', function() {
           return;
         }
         
-        // Process allowance for each account that has an input
+        // Calculate distribution percentages
+        const distribution = {
+          spending: 0,
+          saving: 0,
+          donation: 0
+        };
+        
+        childAccounts.forEach(account => {
+          const input = percentInputs[account.type];
+          if (input) {
+            distribution[account.type] = parseInt(input.value) || 0;
+          }
+        });
+        
+        // Process immediate allowance for each account
         for (const account of childAccounts) {
           const input = percentInputs[account.type];
           
@@ -712,6 +726,45 @@ document.addEventListener('DOMContentLoaded', function() {
           
           if (!response.ok) {
             throw new Error(`Failed to process allowance for ${account.name} account`);
+          }
+        }
+        
+        // If recurring is checked, create a recurring transaction
+        if (recurring) {
+          // Calculate next Sunday (for weekly allowance)
+          const nextDate = new Date();
+          const dayOfWeek = nextDate.getDay(); // 0 is Sunday
+          const daysUntilNextSunday = (7 - dayOfWeek) % 7;
+          nextDate.setDate(nextDate.getDate() + daysUntilNextSunday);
+          nextDate.setHours(0, 0, 0, 0);
+          
+          // Create recurring allowance
+          const mainAccount = childAccounts.find(acc => acc.type === 'spending') || childAccounts[0];
+          
+          const recurringData = {
+            name: 'Weekly Allowance',
+            description: `Weekly allowance for ${childData.name}`,
+            amount: amount,
+            type: 'allowance',
+            frequency: 'weekly',
+            account: mainAccount._id, // Use main account as reference (distribution will handle the rest)
+            user: childId,
+            distribution: distribution,
+            nextDate: nextDate,
+            active: true
+          };
+          
+          const recurringResponse = await fetch(`${API_URL}/recurring`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(recurringData)
+          });
+          
+          if (!recurringResponse.ok) {
+            const errorData = await recurringResponse.json();
+            throw new Error(`Failed to set up recurring allowance: ${errorData.error || 'Unknown error'}`);
           }
         }
         
