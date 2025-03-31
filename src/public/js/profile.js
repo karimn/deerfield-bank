@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const childrenContainerEl = document.getElementById('children-container');
     const accountsListEl = document.getElementById('accounts-list');
     const saveProfileBtn = document.getElementById('save-profile-btn');
+    const dashboardLinkEl = document.getElementById('dashboard-link');
     
     // Current user
     let currentUser = null;
@@ -36,6 +37,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Set current user
         currentUser = authData.user;
+
+        // Set the proper dashboard link based on user role
+        const dashboardPath = currentUser.role === 'parent' ? '/parent-dashboard.html' : '/dashboard.html';
+        dashboardLinkEl.href = dashboardPath;
 
         // This is the code to update the dropdown menu in all JavaScript files
         // Use this in profile.js, child-detail.js and any other place where the dropdown is generated
