@@ -30,11 +30,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const allowanceFormEl = document.getElementById('allowance-form');
     const allowanceAmountEl = document.getElementById('allowance-amount');
-    const spendingPercentEl = document.getElementById('spending-percent');
-    const savingPercentEl = document.getElementById('saving-percent');
-    const donationPercentEl = document.getElementById('donation-percent');
+    const distributionContainerEl = document.getElementById('distribution-container');
     const distributionTotalEl = document.getElementById('distribution-total');
     const recurringAllowanceEl = document.getElementById('recurring-allowance');
+    
+    // Will store references to distribution percent inputs dynamically
+    const percentInputs = {};
     
     // Button elements
     const addAccountBtn = document.getElementById('add-account-btn');
@@ -154,7 +155,7 @@ document.addEventListener('DOMContentLoaded', function() {
       // Add allowance button
       addAllowanceBtn.addEventListener('click', () => {
         allowanceFormEl.reset();
-        updateDistributionTotal();
+        populateDistributionInputs();
         addAllowanceModal.show();
       });
       
@@ -183,20 +184,70 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     }
     
-    // Set up distribution total update
+    // Set up distribution total update - now dynamic based on existing accounts
     function setupDistributionUpdate() {
-      spendingPercentEl.addEventListener('input', updateDistributionTotal);
-      savingPercentEl.addEventListener('input', updateDistributionTotal);
-      donationPercentEl.addEventListener('input', updateDistributionTotal);
+      // The event listeners are added when inputs are created in populateDistributionInputs
+    }
+    
+    // Populate distribution inputs based on existing accounts
+    function populateDistributionInputs() {
+      // Clear previous inputs and reset percentInputs
+      distributionContainerEl.innerHTML = '';
+      Object.keys(percentInputs).forEach(key => delete percentInputs[key]);
+      
+      // Check if child has any accounts
+      if (childAccounts.length === 0) {
+        distributionContainerEl.innerHTML = `
+          <div class="alert alert-warning">
+            No accounts found. Please create at least one account first.
+          </div>
+        `;
+        return;
+      }
+      
+      // Calculate default percentage split evenly across accounts
+      const defaultPercent = Math.floor(100 / childAccounts.length);
+      let remainingPercent = 100 - (defaultPercent * childAccounts.length);
+      
+      // Create inputs for each account type
+      childAccounts.forEach((account, index) => {
+        // Add extra percent to first account if there's a remainder
+        const accountPercent = index === 0 ? defaultPercent + remainingPercent : defaultPercent;
+        
+        const inputId = `${account.type}-percent`;
+        const accountDisplay = capitalizeFirstLetter(account.type);
+        
+        const inputHtml = `
+          <div class="input-group mb-2">
+            <span class="input-group-text">${accountDisplay}</span>
+            <input type="number" class="form-control distribution-input" 
+                  id="${inputId}" value="${accountPercent}" 
+                  min="0" max="100" data-account-id="${account._id}">
+            <span class="input-group-text">%</span>
+          </div>
+        `;
+        
+        distributionContainerEl.insertAdjacentHTML('beforeend', inputHtml);
+        
+        // Store reference to the input
+        percentInputs[account.type] = document.getElementById(inputId);
+        
+        // Add event listener
+        percentInputs[account.type].addEventListener('input', updateDistributionTotal);
+      });
+      
+      // Initial update of total
+      updateDistributionTotal();
     }
     
     // Update distribution total
     function updateDistributionTotal() {
-      const spendingPercent = parseInt(spendingPercentEl.value) || 0;
-      const savingPercent = parseInt(savingPercentEl.value) || 0;
-      const donationPercent = parseInt(donationPercentEl.value) || 0;
+      let total = 0;
       
-      const total = spendingPercent + savingPercent + donationPercent;
+      // Sum up percentages from all distribution inputs
+      Object.values(percentInputs).forEach(input => {
+        total += parseInt(input.value) || 0;
+      });
       
       distributionTotalEl.textContent = `Total: ${total}%`;
       
@@ -596,9 +647,6 @@ document.addEventListener('DOMContentLoaded', function() {
     async function processAllowance() {
       try {
         const amount = parseFloat(allowanceAmountEl.value);
-        const spendingPercent = parseInt(spendingPercentEl.value) || 0;
-        const savingPercent = parseInt(savingPercentEl.value) || 0;
-        const donationPercent = parseInt(donationPercentEl.value) || 0;
         const recurring = recurringAllowanceEl.checked;
         
         if (isNaN(amount) || amount <= 0) {
@@ -606,31 +654,35 @@ document.addEventListener('DOMContentLoaded', function() {
           return;
         }
         
-        const total = spendingPercent + savingPercent + donationPercent;
+        // Check if there are any accounts
+        if (childAccounts.length === 0) {
+          alert('Please create at least one account before adding allowance');
+          return;
+        }
+        
+        // Calculate total percentage
+        let total = 0;
+        childAccounts.forEach(account => {
+          const input = percentInputs[account.type];
+          if (input) {
+            total += parseInt(input.value) || 0;
+          }
+        });
         
         if (total !== 100) {
           alert('Distribution percentages must add up to 100%');
           return;
         }
         
-        // Process allowance for each account type
-        for (const accountType of ['spending', 'saving', 'donation']) {
-          // Find account of this type
-          const account = childAccounts.find(acc => acc.type === accountType);
+        // Process allowance for each account that has an input
+        for (const account of childAccounts) {
+          const input = percentInputs[account.type];
           
-          if (!account) {
-            continue; // Skip if account type doesn't exist
+          if (!input) {
+            continue; // Skip if no input for this account
           }
           
-          let percentValue = 0;
-          
-          if (accountType === 'spending') {
-            percentValue = spendingPercent;
-          } else if (accountType === 'saving') {
-            percentValue = savingPercent;
-          } else if (accountType === 'donation') {
-            percentValue = donationPercent;
-          }
+          const percentValue = parseInt(input.value) || 0;
           
           if (percentValue <= 0) {
             continue; // Skip if no amount allocated
@@ -659,7 +711,7 @@ document.addEventListener('DOMContentLoaded', function() {
           });
           
           if (!response.ok) {
-            throw new Error(`Failed to process allowance for ${accountType} account`);
+            throw new Error(`Failed to process allowance for ${account.name} account`);
           }
         }
         
