@@ -1,5 +1,8 @@
 const mongoose = require('mongoose');
 
+// IMPORTANT: Turn off strict schemas to support additional fields
+mongoose.set('strict', false);
+
 const UserSchema = new mongoose.Schema(
   {
     name: {
@@ -15,6 +18,10 @@ const UserSchema = new mongoose.Schema(
         /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
         'Please add a valid email'
       ]
+    },
+    dateOfBirth: {
+      type: Date,
+      required: false // Not required to support existing users
     },
     googleId: {
       type: String,

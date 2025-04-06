@@ -103,11 +103,26 @@ document.addEventListener('DOMContentLoaded', function() {
           emailEl.value = user.email;
           roleEl.value = capitalizeFirstLetter(user.role);
           
-          // Load additional user profile data if available
-          // Note: These fields would need to be added to the backend model
-          if (user.dob) {
-            dobEl.value = formatDateForInput(user.dob);
+          // Load date of birth if available
+          if (user.dateOfBirth) {
+            dobEl.value = formatDateForInput(user.dateOfBirth);
+            
+            // Make date of birth field readonly for child users
+            if (user.role === 'child') {
+              dobEl.readOnly = true;
+              dobEl.classList.add('readonly-field');
+              // Add explanatory text
+              const dobParent = dobEl.parentElement;
+              if (!dobParent.querySelector('.form-text')) {
+                const helpText = document.createElement('div');
+                helpText.className = 'form-text';
+                helpText.textContent = 'Date of birth can only be changed by your parent';
+                dobParent.appendChild(helpText);
+              }
+            }
           }
+          
+          // Load phone if available
           if (user.phone) {
             phoneEl.value = user.phone;
           }
@@ -252,9 +267,13 @@ document.addEventListener('DOMContentLoaded', function() {
         // Collect form data
         const profileData = {
           // Fields to update
-          dob: dobEl.value || null,
           phone: phoneEl.value || null
         };
+        
+        // Only include dateOfBirth for parent users or if the field isn't readonly
+        if (currentUser.role === 'parent' && !dobEl.readOnly) {
+          profileData.dateOfBirth = dobEl.value || null;
+        }
         
         // Update the user
         const response = await fetch(`${API_URL}/users/${currentUser.id}`, {

@@ -19,6 +19,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const addChildFormEl = document.getElementById('add-child-form');
     const childNameEl = document.getElementById('child-name');
     const childEmailEl = document.getElementById('child-email');
+    const childDobEl = document.getElementById('child-dob');
+    
+    // Check if date element exists and log
+    console.log('DOB Element found:', childDobEl ? 'Yes' : 'No');
+    if (childDobEl) {
+      console.log('DOB Element value accessor:', Object.getOwnPropertyDescriptor(childDobEl, 'value'));
+      childDobEl.addEventListener('change', (e) => {
+        console.log('DOB changed:', e.target.value);
+      });
+    }
+    
     const createAccountsEl = document.getElementById('create-accounts');
     const initialBalanceEl = document.getElementById('initial-balance');
     
@@ -130,6 +141,16 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 6. Update distribution total
         updateDistributionTotal();
+        
+        // 7. Check if we need to open the edit child modal from URL parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        const editChildId = urlParams.get('editChild');
+        if (editChildId) {
+          // Clean the URL to remove the parameter
+          window.history.replaceState({}, document.title, '/parent-dashboard.html');
+          // Open the edit modal
+          editChild(editChildId);
+        }
         
       } catch (error) {
         console.error('Initialization error:', error);
@@ -411,6 +432,12 @@ function addChildButtonEventListeners() {
       // Pre-fill the child form
       childNameEl.value = child.name;
       childEmailEl.value = child.email;
+      
+      // Format date of birth if exists
+      if (child.dateOfBirth) {
+        childDobEl.value = formatDateForInput(child.dateOfBirth);
+      }
+      
       createAccountsEl.checked = false; // Don't create new accounts by default when editing
       
       // Store the childId for the save function
@@ -435,16 +462,40 @@ function addChildButtonEventListeners() {
     try {
       const name = childNameEl.value;
       const email = childEmailEl.value;
+      
+      // Ensure date is properly formatted (YYYY-MM-DD)
+      let dateOfBirth = null;
+      if (childDobEl.value) {
+        // Format date properly for API
+        const dobDate = new Date(childDobEl.value);
+        if (!isNaN(dobDate.getTime())) {
+          // Format as ISO string and just keep the date part (YYYY-MM-DD)
+          dateOfBirth = dobDate.toISOString().split('T')[0];
+          console.log('Formatted DOB:', childDobEl.value, '->', dateOfBirth);
+        } else {
+          console.error('Invalid date format in input:', childDobEl.value);
+        }
+      }
+      
       const createAccounts = createAccountsEl.checked;
       const initialBalance = parseFloat(initialBalanceEl.value) || 0;
       
       if (!name || !email) {
-        alert('Please fill out all required fields');
+        alert('Please fill out name and email fields');
+        return;
+      }
+      
+      // Only require dateOfBirth for new child users
+      if (!currentEditChildId && !dateOfBirth) {
+        alert('Date of birth is required for new child users');
         return;
       }
       
       // Check if we're editing an existing child or creating a new one
       if (currentEditChildId) {
+        // Debug: log what we're sending
+        console.log('Updating child with:', { name, email, dateOfBirth });
+        
         // Update existing child
         const userResponse = await fetch(`${API_URL}/users/${currentEditChildId}`, {
           method: 'PUT',
@@ -453,7 +504,8 @@ function addChildButtonEventListeners() {
           },
           body: JSON.stringify({
             name,
-            email
+            email,
+            dateOfBirth
           })
         });
         
@@ -479,7 +531,20 @@ function addChildButtonEventListeners() {
         // Success message
         alert(`Child ${name} updated successfully!`);
       } else {
+        // Debug: log what we're sending for new child
+        console.log('Creating new child with:', { 
+          name, 
+          email, 
+          dateOfBirth, 
+          dateOfBirthType: typeof dateOfBirth,
+          dateValid: !isNaN(new Date(dateOfBirth).getTime())
+        });
+        
         // Create new child user
+        // Try with hardcoded date first to see if it works
+        const dateString = dateOfBirth || '2010-01-01'; // Fallback date for testing
+        console.log('Using date string:', dateString);
+        
         const userResponse = await fetch(`${API_URL}/users`, {
           method: 'POST',
           headers: {
@@ -488,6 +553,7 @@ function addChildButtonEventListeners() {
           body: JSON.stringify({
             name,
             email,
+            dateOfBirth: dateString, // Use explicit string format
             role: 'child',
             parent: currentUser.id
           })
