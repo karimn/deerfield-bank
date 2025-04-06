@@ -156,7 +156,22 @@ document.addEventListener('DOMContentLoaded', function() {
       addAllowanceBtn.addEventListener('click', () => {
         allowanceFormEl.reset();
         populateDistributionInputs();
+        calculateAgeBasedAllowance(); // Calculate the age-based amount when modal opens
         addAllowanceModal.show();
+      });
+      
+      // Age-based calculation checkbox
+      const useAgeFormulaEl = document.getElementById('use-age-formula');
+      useAgeFormulaEl.addEventListener('change', function() {
+        const ageResultEl = document.getElementById('age-calculation-result');
+        if (this.checked) {
+          ageResultEl.classList.remove('d-none');
+          calculateAgeBasedAllowance();
+        } else {
+          ageResultEl.classList.add('d-none');
+          // Reset to default
+          allowanceAmountEl.value = '10.00';
+        }
       });
       
       // Save allowance button
@@ -281,11 +296,17 @@ document.addEventListener('DOMContentLoaded', function() {
           <div class="mb-3">
             <strong>Email:</strong> ${childData.email}
           </div>
-          ${childData.dob ? `
+          ${childData.dateOfBirth ? `
           <div class="mb-3">
-            <strong>Date of Birth:</strong> ${new Date(childData.dob).toLocaleDateString()}
+            <strong>Date of Birth:</strong> ${new Date(childData.dateOfBirth).toLocaleDateString()}
           </div>
-          ` : ''}
+          ` : `
+          <div class="alert alert-warning mb-3">
+            <strong>Date of Birth Missing</strong>
+            <p class="mb-0">Please update this child's profile to add their date of birth.</p>
+            <button class="btn btn-sm btn-primary mt-2" id="update-dob-btn">Update Now</button>
+          </div>
+          `}
           ${childData.phone ? `
           <div class="mb-3">
             <strong>Phone:</strong> ${childData.phone}
@@ -295,6 +316,15 @@ document.addEventListener('DOMContentLoaded', function() {
             <strong>Joined:</strong> ${new Date(childData.createdAt).toLocaleDateString()}
           </div>
         `;
+        
+        // Add event listener to update DOB button if it exists
+        const updateDobBtn = document.getElementById('update-dob-btn');
+        if (updateDobBtn) {
+          updateDobBtn.addEventListener('click', () => {
+            // Open edit modal or navigate to edit page
+            editChild(childData._id);
+          });
+        }
         
       } catch (error) {
         console.error('Error loading child data:', error);
@@ -646,7 +676,16 @@ document.addEventListener('DOMContentLoaded', function() {
     // Process allowance
     async function processAllowance() {
       try {
-        const amount = parseFloat(allowanceAmountEl.value);
+        // Get the amount - either direct value or from the age formula
+        let amount = parseFloat(allowanceAmountEl.value);
+        const useAgeFormula = document.getElementById('use-age-formula')?.checked;
+        
+        // If using age formula, make sure the calculation is done
+        if (useAgeFormula) {
+          calculateAgeBasedAllowance();
+          amount = parseFloat(allowanceAmountEl.value);
+        }
+        
         const recurring = recurringAllowanceEl.checked;
         
         if (isNaN(amount) || amount <= 0) {
@@ -812,6 +851,45 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     }
     
+    // Calculate age-based allowance
+    function calculateAgeBasedAllowance() {
+      // Only proceed if child data is available and includes dateOfBirth
+      if (!childData || !childData.dateOfBirth) {
+        console.warn('Cannot calculate age-based allowance: Missing date of birth');
+        return;
+      }
+      
+      // Get child's age
+      const dob = new Date(childData.dateOfBirth);
+      const today = new Date();
+      
+      // Basic age calculation
+      let age = today.getFullYear() - dob.getFullYear();
+      
+      // Adjust age if birthday hasn't occurred this year yet
+      const monthDiff = today.getMonth() - dob.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+        age--;
+      }
+      
+      // Apply the formula: floor(age) * 1.2
+      const ageFloor = Math.floor(age);
+      const allowanceAmount = (ageFloor * 1.2).toFixed(2);
+      
+      // Update display
+      const childAgeEl = document.getElementById('child-age');
+      const calculatedAmountEl = document.getElementById('calculated-amount');
+      
+      if (childAgeEl) childAgeEl.textContent = ageFloor;
+      if (calculatedAmountEl) calculatedAmountEl.textContent = allowanceAmount;
+      
+      // Update the input field if the checkbox is checked
+      const useAgeFormulaEl = document.getElementById('use-age-formula');
+      if (useAgeFormulaEl && useAgeFormulaEl.checked) {
+        allowanceAmountEl.value = allowanceAmount;
+      }
+    }
+    
     // Format currency
     function formatCurrency(amount) {
       return new Intl.NumberFormat('en-US', {
@@ -823,5 +901,16 @@ document.addEventListener('DOMContentLoaded', function() {
     // Capitalize first letter
     function capitalizeFirstLetter(string) {
       return string.charAt(0).toUpperCase() + string.slice(1);
+    }
+    
+    // Edit child function - opens modal to edit child details
+    function editChild(childId) {
+      // This would ideally open a modal for editing child information
+      // Simpler implementation: redirect to parent dashboard where editing can be done
+      window.location.href = `/parent-dashboard.html?editChild=${childId}`;
+      
+      // Alternative: if we had an edit modal on this page, we would show it here
+      // const editChildModal = new bootstrap.Modal(document.getElementById('editChildModal'));
+      // editChildModal.show();
     }
   });
