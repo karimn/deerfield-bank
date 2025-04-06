@@ -51,15 +51,6 @@ exports.createUser = async (req, res, next) => {
     const dateOfBirthMissing = !req.body.dateOfBirth || req.body.dateOfBirth === '';
     console.log('dateOfBirthMissing:', dateOfBirthMissing);
     
-    // !!!TEMPORARY WORKAROUND!!!
-    // For now, if date is missing, set a default date instead of rejecting
-    if (req.body.role === 'child' && dateOfBirthMissing) {
-      console.log('Adding default date of birth for child user');
-      req.body.dateOfBirth = '2010-01-01'; // Default to January 1, 2010
-    }
-    
-    // Old validation code - commented out for now 
-    /*
     // Check for required fields for new child users
     if (req.body.role === 'child' && dateOfBirthMissing) {
       return res.status(400).json({
@@ -67,7 +58,6 @@ exports.createUser = async (req, res, next) => {
         error: 'Date of birth is required for new child users'
       });
     }
-    */
     
     // Validate date format if provided
     if (req.body.dateOfBirth) {

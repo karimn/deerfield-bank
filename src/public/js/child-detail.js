@@ -197,6 +197,15 @@ document.addEventListener('DOMContentLoaded', function() {
           interestRateEl.value = 0;
         }
       });
+      
+      // Edit child button
+      const editChildBtn = document.getElementById('edit-child-btn');
+      if (editChildBtn) {
+        editChildBtn.addEventListener('click', () => {
+          // Call the editChild function with the current child ID
+          editChild(childId);
+        });
+      }
     }
     
     // Set up distribution total update - now dynamic based on existing accounts
