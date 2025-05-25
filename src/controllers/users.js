@@ -44,51 +44,28 @@ exports.getUser = async (req, res, next) => {
 // @access  Private/Admin
 exports.createUser = async (req, res, next) => {
   try {
-    // Debug: Log incoming request
-    console.log('Creating user with request body:', JSON.stringify(req.body));
-    
-    // Check if dateOfBirth is empty string or null or undefined
-    const dateOfBirthMissing = !req.body.dateOfBirth || req.body.dateOfBirth === '';
-    console.log('dateOfBirthMissing:', dateOfBirthMissing);
-    
-    // Check for required fields for new child users
-    if (req.body.role === 'child' && dateOfBirthMissing) {
+    const existingUser = await User.findOne({ email: req.body.email });
+    if (existingUser) {
       return res.status(400).json({
         success: false,
-        error: 'Date of birth is required for new child users'
+        error: 'User with this email already exists'
       });
     }
     
-    // Validate date format if provided
-    if (req.body.dateOfBirth) {
-      const dateObject = new Date(req.body.dateOfBirth);
-      const isValidDate = !isNaN(dateObject.getTime());
-      console.log('Date validation:', req.body.dateOfBirth, '->', dateObject, 'isValid:', isValidDate);
-      
-      if (!isValidDate) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid date of birth format'
-        });
-      }
-    }
-    
-    // Create user with manual validation
     const userData = {
       name: req.body.name,
       email: req.body.email,
       role: req.body.role || 'child',
-      parent: req.body.parent
+      parent: req.body.parent,
+      firstName: req.body.firstName,
+      lastName: req.body.lastName,
+      dateOfBirth: req.body.dateOfBirth,
+      googleId: req.body.googleId,
+      phone: req.body.phone
     };
     
-    // Only add dateOfBirth if it's provided
-    if (req.body.dateOfBirth) {
-      userData.dateOfBirth = req.body.dateOfBirth;
-    }
-    
-    // Add any other fields
-    if (req.body.googleId) userData.googleId = req.body.googleId;
-    if (req.body.phone) userData.phone = req.body.phone;
+    // Remove undefined fields
+    Object.keys(userData).forEach(key => userData[key] === undefined && delete userData[key]);
     
     const user = await User.create(userData);
     
@@ -97,6 +74,12 @@ exports.createUser = async (req, res, next) => {
       data: user
     });
   } catch (err) {
+    if (err.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        error: 'User with this email already exists'
+      });
+    }
     next(err);
   }
 };
@@ -106,33 +89,57 @@ exports.createUser = async (req, res, next) => {
 // @access  Private/Admin or Self
 exports.updateUser = async (req, res, next) => {
   try {
-    // Prevent child users from changing their date of birth
-    if (req.user && req.user.role === 'child' && req.user._id.toString() === req.params.id && req.body.dateOfBirth) {
-      delete req.body.dateOfBirth;
-    }
-    
-    // Use direct MongoDB operations to bypass Mongoose validation
-    // This is a more aggressive approach but ensures updates work for legacy users
-    const user = await User.findOneAndUpdate(
-      { _id: req.params.id },
-      { $set: req.body },
-      { 
-        new: true,              // Return updated document
-        runValidators: false,   // Skip validators
-        strict: false           // Allow updating fields not in schema
-      }
-    );
-    
+    const user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).json({
         success: false,
         error: 'User not found'
       });
     }
-
+    
+    const updateData = { ...req.body };
+    
+    // Handle date parsing for dateOfBirth
+    if (updateData.dateOfBirth) {
+      const dateStr = updateData.dateOfBirth;
+      let parsedDate;
+      
+      if (typeof dateStr === 'string' && dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        // YYYY-MM-DD format
+        const [year, month, day] = dateStr.split('-').map(num => parseInt(num, 10));
+        parsedDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+      } else {
+        parsedDate = new Date(dateStr);
+      }
+      
+      if (isNaN(parsedDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid date format'
+        });
+      }
+      
+      updateData.dateOfBirth = parsedDate;
+    }
+    
+    // Auto-generate name from firstName and lastName if both provided
+    if (updateData.firstName && updateData.lastName) {
+      updateData.name = `${updateData.firstName} ${updateData.lastName}`;
+    } else if (updateData.firstName || updateData.lastName) {
+      const firstName = updateData.firstName || user.firstName || '';
+      const lastName = updateData.lastName || user.lastName || '';
+      updateData.name = `${firstName} ${lastName}`.trim();
+    }
+    
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+    
     res.status(200).json({
       success: true,
-      data: user
+      data: updatedUser
     });
   } catch (err) {
     next(err);
@@ -144,7 +151,7 @@ exports.updateUser = async (req, res, next) => {
 // @access  Private/Admin
 exports.deleteUser = async (req, res, next) => {
   try {
-    const user = await User.findById(req.params.id);
+    const user = await User.findByIdAndDelete(req.params.id);
     
     if (!user) {
       return res.status(404).json({
@@ -152,8 +159,6 @@ exports.deleteUser = async (req, res, next) => {
         error: 'User not found'
       });
     }
-
-    await user.remove();
 
     res.status(200).json({
       success: true,

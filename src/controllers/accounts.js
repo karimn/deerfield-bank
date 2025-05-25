@@ -118,7 +118,7 @@ exports.deleteAccount = async (req, res, next) => {
       });
     }
 
-    await account.remove();
+    await Account.findByIdAndDelete(req.params.id);
 
     res.status(200).json({
       success: true,

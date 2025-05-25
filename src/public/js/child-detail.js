@@ -907,6 +907,20 @@ document.addEventListener('DOMContentLoaded', function() {
       }).format(amount);
     }
     
+    // Format date for input (YYYY-MM-DD)
+    function formatDateForInput(dateString) {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        console.error('Invalid date:', dateString);
+        return '';
+      }
+      
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+    
     // Capitalize first letter
     function capitalizeFirstLetter(string) {
       return string.charAt(0).toUpperCase() + string.slice(1);
@@ -914,12 +928,108 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Edit child function - opens modal to edit child details
     function editChild(childId) {
-      // This would ideally open a modal for editing child information
-      // Simpler implementation: redirect to parent dashboard where editing can be done
-      window.location.href = `/parent-dashboard.html?editChild=${childId}`;
+      console.log('Opening edit modal for child:', childId);
       
-      // Alternative: if we had an edit modal on this page, we would show it here
-      // const editChildModal = new bootstrap.Modal(document.getElementById('editChildModal'));
-      // editChildModal.show();
+      // We already have the child data in memory, use it to populate the form
+      if (!childData) {
+        console.error('No child data available');
+        alert('Error: Child data not available');
+        return;
+      }
+      
+      // Populate form fields
+      document.getElementById('edit-child-name').value = childData.name || '';
+      document.getElementById('edit-child-email').value = childData.email || '';
+      
+      // Format date of birth if available
+      if (childData.dateOfBirth) {
+        document.getElementById('edit-child-dob').value = formatDateForInput(childData.dateOfBirth);
+      }
+      
+      // Create and show modal
+      const editChildModal = new bootstrap.Modal(document.getElementById('editChildModal'));
+      editChildModal.show();
+      
+      // Add event listener to the save button
+      document.getElementById('save-child-btn').addEventListener('click', saveChildChanges);
+    }
+    
+    // Function to save child changes
+    async function saveChildChanges() {
+      try {
+        // Get form values
+        const fullName = document.getElementById('edit-child-name').value;
+        const dateOfBirth = document.getElementById('edit-child-dob').value;
+        
+        // Parse the name into first and last name
+        const nameParts = fullName.split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+        
+        console.log('Saving child changes:', {
+          fullName,
+          firstName,
+          lastName,
+          dateOfBirth
+        });
+        
+        // Format the date properly
+        let formattedDate = null;
+        if (dateOfBirth) {
+          // Just use the input date format directly - HTML date inputs are already in YYYY-MM-DD format
+          // This avoids any timezone conversion issues when creating a new Date object
+          if (dateOfBirth.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            formattedDate = dateOfBirth;
+            console.log('Using direct date input:', dateOfBirth);
+          } else {
+            // Fall back to the old method just in case
+            const dobDate = new Date(dateOfBirth);
+            if (!isNaN(dobDate.getTime())) {
+              formattedDate = dobDate.toISOString().split('T')[0];
+              console.log('Formatted DOB:', dateOfBirth, '->', formattedDate);
+            } else {
+              console.error('Invalid date format in input:', dateOfBirth);
+              alert('Invalid date format');
+              return;
+            }
+          }
+        }
+        
+        // Update the child
+        const response = await fetch(`${API_URL}/users/${childData._id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            firstName,
+            lastName,
+            dateOfBirth: formattedDate
+          })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Server returned ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to update child');
+        }
+        
+        // Close the modal
+        const editChildModal = bootstrap.Modal.getInstance(document.getElementById('editChildModal'));
+        editChildModal.hide();
+        
+        // Reload the page to show updated information
+        alert('Child information updated successfully!');
+        window.location.reload();
+        
+      } catch (error) {
+        console.error('Error saving child changes:', error);
+        alert(`Error: ${error.message}`);
+      }
     }
   });

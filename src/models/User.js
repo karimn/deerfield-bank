@@ -1,13 +1,18 @@
 const mongoose = require('mongoose');
 
-// IMPORTANT: Turn off strict schemas to support additional fields
-mongoose.set('strict', false);
-
 const UserSchema = new mongoose.Schema(
   {
     name: {
       type: String,
       required: [true, 'Please add a name'],
+      trim: true
+    },
+    firstName: {
+      type: String,
+      trim: true
+    },
+    lastName: {
+      type: String,
       trim: true
     },
     email: {
@@ -20,8 +25,11 @@ const UserSchema = new mongoose.Schema(
       ]
     },
     dateOfBirth: {
-      type: Date,
-      required: false // Not required to support existing users
+      type: Date
+    },
+    phone: {
+      type: String,
+      trim: true
     },
     googleId: {
       type: String,

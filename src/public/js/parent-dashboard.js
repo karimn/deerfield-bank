@@ -142,15 +142,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // 6. Update distribution total
         updateDistributionTotal();
         
-        // 7. Check if we need to open the edit child modal from URL parameter
-        const urlParams = new URLSearchParams(window.location.search);
-        const editChildId = urlParams.get('editChild');
-        if (editChildId) {
-          // Clean the URL to remove the parameter
-          window.history.replaceState({}, document.title, '/parent-dashboard.html');
-          // Open the edit modal
-          editChild(editChildId);
-        }
+        // Edit functionality has been moved to child-detail.html page
         
       } catch (error) {
         console.error('Initialization error:', error);
@@ -262,11 +254,21 @@ async function loadChildren() {
         // Calculate total balance across all accounts
         const totalBalance = child.accounts.reduce((sum, account) => sum + account.balance, 0);
         
+        // Get display name - use firstName & lastName if available, otherwise fall back to name
+        let displayName = '';
+        if (child.firstName && child.lastName) {
+          displayName = `${child.firstName} ${child.lastName}`;
+        } else if (child.name) {
+          displayName = child.name;
+        } else {
+          displayName = 'Unknown';
+        }
+        
         return `
           <div class="col-md-6 mb-4">
             <div class="card child-card h-100">
               <div class="card-body">
-                <h5 class="card-title">${child.name}</h5>
+                <h5 class="card-title">${displayName}</h5>
                 <h6 class="card-subtitle mb-2 text-muted">${child.email}</h6>
                 <p class="card-text">Total Balance: ${formatCurrency(totalBalance)}</p>
                 <div class="d-flex flex-wrap gap-2 mb-3">
@@ -278,11 +280,8 @@ async function loadChildren() {
                 </div>
               </div>
               <div class="card-footer bg-transparent">
-                <div class="btn-group w-100" role="group">
-                  <button type="button" class="btn btn-outline-primary btn-sm edit-child" data-id="${child._id}">
-                    Edit
-                  </button>
-                  <button type="button" class="btn btn-outline-success btn-sm view-child" data-id="${child._id}">
+                <div class="w-100">
+                  <button type="button" class="btn btn-outline-success btn-sm w-100 view-child" data-id="${child._id}">
                     View Details
                   </button>
                 </div>
@@ -395,7 +394,7 @@ async function loadChildren() {
     // Add this to the setupEventListeners function in parent-dashboard.js
 // after the loadChildren() function has completed successfully
 
-// Add event listeners to Edit and View Details buttons
+// Add event listeners to View Details buttons
 function addChildButtonEventListeners() {
     // View Details buttons
     document.querySelectorAll('.view-child').forEach(button => {
@@ -405,63 +404,21 @@ function addChildButtonEventListeners() {
         window.location.href = `/child-detail.html?id=${childId}`;
       });
     });
-    
-    // Edit buttons
-    document.querySelectorAll('.edit-child').forEach(button => {
-      button.addEventListener('click', () => {
-        const childId = button.getAttribute('data-id');
-        // For now, let's just find the child and show the edit modal
-        editChild(childId);
-      });
-    });
   }
   
-  // Add this function to handle editing a child
-  async function editChild(childId) {
-    try {
-      // Find the child data from the list of children
-      const response = await fetch(`${API_URL}/users/${childId}`);
-      const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to load child data');
-      }
-      
-      const child = data.data;
-      
-      // Pre-fill the child form
-      childNameEl.value = child.name;
-      childEmailEl.value = child.email;
-      
-      // Format date of birth if exists
-      if (child.dateOfBirth) {
-        childDobEl.value = formatDateForInput(child.dateOfBirth);
-      }
-      
-      createAccountsEl.checked = false; // Don't create new accounts by default when editing
-      
-      // Store the childId for the save function
-      currentEditChildId = childId;
-      
-      // Change the modal title to indicate editing
-      document.querySelector('#addChildModal .modal-title').textContent = 'Edit Child';
-      
-      // Change the save button text
-      saveChildBtn.textContent = 'Update';
-      
-      // Show the modal
-      addChildModal.show();
-    } catch (error) {
-      console.error('Error preparing child edit:', error);
-      alert(`Error: ${error.message}`);
-    }
-  }
+  // Edit functionality has been removed - all child editing is now done on child-detail.html page
   
   // Modify the saveChild function to handle both creating and updating
   async function saveChild() {
     try {
-      const name = childNameEl.value;
+      // Get form values
+      const fullName = childNameEl.value;
       const email = childEmailEl.value;
+      
+      // Split the name into firstName and lastName
+      const nameParts = fullName.split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
       
       // Ensure date is properly formatted (YYYY-MM-DD)
       let dateOfBirth = null;
@@ -480,80 +437,136 @@ function addChildButtonEventListeners() {
       const createAccounts = createAccountsEl.checked;
       const initialBalance = parseFloat(initialBalanceEl.value) || 0;
       
-      if (!name || !email) {
+      if (!fullName || !email) {
         alert('Please fill out name and email fields');
         return;
       }
       
-      // Only require dateOfBirth for new child users
-      if (!currentEditChildId && !dateOfBirth) {
-        alert('Date of birth is required for new child users');
-        return;
-      }
+      // IMPORTANT: Removed date of birth validation completely
       
       // Check if we're editing an existing child or creating a new one
       if (currentEditChildId) {
         // Debug: log what we're sending
-        console.log('Updating child with:', { name, email, dateOfBirth });
+        console.log('Updating child with:', { firstName, lastName, email, dateOfBirth });
         
-        // Update existing child
-        const userResponse = await fetch(`${API_URL}/users/${currentEditChildId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            name,
-            email,
-            dateOfBirth
-          })
+        // *** IMPORTANT *** 
+        // Log what we're about to do so we can debug it
+        console.log(`PUT request to ${API_URL}/users/${currentEditChildId} with:`, {
+          firstName,
+          lastName,
+          email,
+          dateOfBirth
         });
         
-        const userData = await userResponse.json();
-        
-        if (!userData.success) {
-          throw new Error(userData.error || 'Failed to update child');
+        // Update existing child
+        try {
+          console.log('✅ DIRECT UPDATE: Updating child with ID', currentEditChildId);
+          console.log('✅ Date of birth value:', dateOfBirth);
+          console.log('✅ First Name:', firstName);
+          console.log('✅ Last Name:', lastName);
+          
+          // Create update data object
+          const updateData = {
+            firstName,
+            lastName,
+            email
+          };
+          
+          // Only include dateOfBirth if it's not empty
+          if (dateOfBirth) {
+            updateData.dateOfBirth = dateOfBirth;
+            console.log('✅ Including DOB in update:', dateOfBirth);
+          } else {
+            console.log('❌ DOB is empty, not including in update');
+          }
+          
+          // Use direct update API
+          const userResponse = await fetch(`${API_URL}/users/${currentEditChildId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(updateData)
+          });
+          
+          // If fetch succeeded but API returned an error
+          if (!userResponse.ok) {
+            const errorData = await userResponse.json();
+            console.error('Error response from server:', errorData);
+            throw new Error(errorData.error || `Server returned ${userResponse.status}: ${userResponse.statusText}`);
+          }
+          
+          const userData = await userResponse.json();
+          
+          if (!userData.success) {
+            throw new Error(userData.error || 'Failed to update child');
+          }
+          
+          // Reset currentEditChildId
+          currentEditChildId = null;
+          
+          // Reset modal title and button text
+          document.querySelector('#addChildModal .modal-title').textContent = 'Add New Child';
+          saveChildBtn.textContent = 'Save';
+          
+          // Close modal
+          addChildModal.hide();
+          
+          // Refresh children list
+          await loadChildren();
+          
+          // Success message
+          alert(`Child ${fullName} updated successfully!`);
+        } catch (error) {
+          console.error('Error updating child:', error);
+          alert(`Error updating child: ${error.message || 'Unknown error'}`);
         }
-        
-        // Reset currentEditChildId
-        currentEditChildId = null;
-        
-        // Reset modal title and button text
-        document.querySelector('#addChildModal .modal-title').textContent = 'Add New Child';
-        saveChildBtn.textContent = 'Save';
-        
-        // Close modal
-        addChildModal.hide();
-        
-        // Refresh children list
-        await loadChildren();
-        
-        // Success message
-        alert(`Child ${name} updated successfully!`);
       } else {
         // Debug: log what we're sending for new child
         console.log('Creating new child with:', { 
-          name, 
+          firstName,
+          lastName,
           email, 
           dateOfBirth, 
-          dateOfBirthType: typeof dateOfBirth,
           dateValid: !isNaN(new Date(dateOfBirth).getTime())
         });
         
-        // Create new child user
-        // Try with hardcoded date first to see if it works
-        const dateString = dateOfBirth || '2010-01-01'; // Fallback date for testing
-        console.log('Using date string:', dateString);
+        // Check if a child with this email already exists
+        try {
+          const checkResponse = await fetch(`${API_URL}/users`);
+          const checkData = await checkResponse.json();
+          
+          if (checkData.success) {
+            const existingChild = checkData.data.find(user => 
+              user.email.toLowerCase() === email.toLowerCase() && user.role === 'child'
+            );
+            
+            if (existingChild) {
+              // If the child exists, switch to update mode instead
+              console.log('Child with this email already exists, switching to update mode');
+              currentEditChildId = existingChild._id;
+              
+              // Recursively call saveChild again, but now in edit mode
+              return saveChild();
+            }
+          }
+        } catch (checkError) {
+          console.error('Error checking for existing child:', checkError);
+          // Continue with creation attempt
+        }
         
+        // Create new child user
         const userResponse = await fetch(`${API_URL}/users`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            name,
+            firstName,
+            lastName,
+            name: fullName,
             email,
-            dateOfBirth: dateString, // Use explicit string format
+            dateOfBirth,
             role: 'child',
             parent: currentUser.id
           })
@@ -595,7 +608,7 @@ function addChildButtonEventListeners() {
         await loadChildren();
         
         // Success message
-        alert(`Child ${name} added successfully!`);
+        alert(`Child ${fullName} added successfully!`);
       }
     } catch (error) {
       console.error('Error saving child:', error);
