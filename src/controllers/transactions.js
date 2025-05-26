@@ -28,9 +28,9 @@ exports.getTransactions = async (req, res, next) => {
       if (currentUser) {
         let accountOwners = [currentUser._id];
         
-        // If user is a parent, include their children's accounts
+        // If user is a parent, include their children's accounts (multiple parent support)
         if (currentUser.role === 'parent') {
-          const children = await User.find({ parent: currentUser._id });
+          const children = await User.findChildrenOfParent(currentUser._id);
           accountOwners = accountOwners.concat(children.map(child => child._id));
         }
         
@@ -64,6 +64,16 @@ exports.getTransactions = async (req, res, next) => {
     // Filter by approval status
     if (req.query.approved !== undefined) {
       filter.approved = req.query.approved === 'true';
+    }
+    
+    // Filter by rejection status
+    if (req.query.rejected !== undefined) {
+      filter.rejected = req.query.rejected === 'true';
+    }
+    
+    // If no specific rejected filter and no approval filter, exclude rejected transactions
+    if (req.query.rejected === undefined && req.query.includeRejected !== 'true') {
+      filter.rejected = { $ne: true };
     }
     
     // Pagination
@@ -224,7 +234,7 @@ exports.updateTransaction = async (req, res, next) => {
   }
 };
 
-// @desc    Delete transaction
+// @desc    Reject transaction (instead of deleting)
 // @route   DELETE /api/transactions/:id
 // @access  Private/Admin
 exports.deleteTransaction = async (req, res, next) => {
@@ -238,7 +248,15 @@ exports.deleteTransaction = async (req, res, next) => {
       });
     }
     
-    // If transaction is approved, update account balance
+    // If transaction is already rejected, return error
+    if (transaction.rejected) {
+      return res.status(400).json({
+        success: false,
+        error: 'Transaction is already rejected'
+      });
+    }
+    
+    // If transaction is approved, update account balance (reverse the effect)
     if (transaction.approved) {
       const account = await Account.findById(transaction.account);
       
@@ -255,11 +273,22 @@ exports.deleteTransaction = async (req, res, next) => {
       await Account.findByIdAndUpdate(account._id, { balance: newBalance });
     }
     
-    await transaction.deleteOne();
+    // Mark transaction as rejected instead of deleting
+    const updatedTransaction = await Transaction.findByIdAndUpdate(
+      req.params.id,
+      {
+        rejected: true,
+        rejectedBy: req.user.id,
+        rejectedAt: new Date(),
+        approved: false // Ensure it's not approved if it was
+      },
+      { new: true }
+    );
 
     res.status(200).json({
       success: true,
-      data: {}
+      message: 'Transaction rejected successfully',
+      data: updatedTransaction
     });
   } catch (err) {
     next(err);

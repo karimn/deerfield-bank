@@ -122,8 +122,8 @@ document.addEventListener('DOMContentLoaded', function() {
     async function fetchTransactions() {
       // Filter by user's accounts
       const accountIds = userAccounts.map(account => account._id);
-      // In a real implementation, you'd pass these to the API
-      const response = await fetch(`${API_URL}/transactions`);
+      // Include rejected transactions to show them in the UI
+      const response = await fetch(`${API_URL}/transactions?includeRejected=true`);
       const data = await response.json();
       
       // Client-side filtering (ideally this would be done on the server)
@@ -191,16 +191,24 @@ document.addEventListener('DOMContentLoaded', function() {
           ? 'text-success' : 'text-danger';
         const amountPrefix = transaction.type === 'deposit' || transaction.type === 'interest' ? '+' : '-';
         const accountName = transaction.account.name || 'Unknown';
-        const statusBadge = transaction.approved 
-          ? '<span class="badge bg-success">Approved</span>' 
-          : '<span class="badge bg-warning text-dark">Pending</span>';
+        let statusBadge;
+        if (transaction.rejected) {
+          statusBadge = '<span class="badge bg-danger">Rejected</span>';
+        } else if (transaction.approved) {
+          statusBadge = '<span class="badge bg-success">Approved</span>';
+        } else {
+          statusBadge = '<span class="badge bg-warning text-dark">Pending</span>';
+        }
+        
+        const rowClass = transaction.rejected ? 'transaction-row rejected-transaction' : 'transaction-row';
+        const textClass = transaction.rejected ? 'text-muted' : '';
         
         return `
-          <tr class="transaction-row">
-            <td>${date}</td>
-            <td>${transaction.description}</td>
-            <td>${accountName}</td>
-            <td class="${amountClass}">${amountPrefix}${amount}</td>
+          <tr class="${rowClass}">
+            <td class="${textClass}">${date}</td>
+            <td class="${textClass}">${transaction.description}</td>
+            <td class="${textClass}">${accountName}</td>
+            <td class="${transaction.rejected ? 'text-muted' : amountClass}">${amountPrefix}${amount}</td>
             <td>${statusBadge}</td>
           </tr>
         `;

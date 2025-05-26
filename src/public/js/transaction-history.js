@@ -155,7 +155,8 @@ document.addEventListener('DOMContentLoaded', function() {
             // Build query parameters  
             const params = new URLSearchParams({
                 page: currentPage,
-                limit: pageSizeSelect.value
+                limit: pageSizeSelect.value,
+                includeRejected: 'true'  // Include rejected transactions in history view
             });
             
             // Backend will automatically filter based on user role:
@@ -216,7 +217,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         transactions.forEach(transaction => {
             const row = document.createElement('tr');
-            row.className = 'transaction-row';
+            row.className = transaction.rejected ? 'transaction-row rejected-transaction' : 'transaction-row';
             
             // Format date
             const date = new Date(transaction.date);
@@ -233,8 +234,17 @@ document.addEventListener('DOMContentLoaded', function() {
             const formattedAmount = formatCurrency(Math.abs(transaction.amount));
             
             // Format status
-            const statusClass = transaction.approved ? 'success' : 'warning';
-            const statusText = transaction.approved ? 'Approved' : 'Pending';
+            let statusClass, statusText;
+            if (transaction.rejected) {
+                statusClass = 'danger';
+                statusText = 'Rejected';
+            } else if (transaction.approved) {
+                statusClass = 'success';
+                statusText = 'Approved';
+            } else {
+                statusClass = 'warning';
+                statusText = 'Pending';
+            }
             
             // Capitalize transaction type
             const typeText = transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1);

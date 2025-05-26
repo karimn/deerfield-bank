@@ -35,6 +35,17 @@ const TransactionSchema = new mongoose.Schema(
         return this.type === 'interest';  // Auto-approve interest
       }
     },
+    rejected: {
+      type: Boolean,
+      default: false
+    },
+    rejectedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    rejectedAt: {
+      type: Date
+    },
     subscription: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Subscription'

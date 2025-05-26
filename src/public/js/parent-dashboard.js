@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const addChildModal = new bootstrap.Modal(document.getElementById('addChildModal'));
     const approvalModal = new bootstrap.Modal(document.getElementById('approvalModal'));
     const recurringTransactionModal = new bootstrap.Modal(document.getElementById('recurringTransactionModal'));
+    const quickTransactionModal = new bootstrap.Modal(document.getElementById('quickTransactionModal'));
     const approvalModalBodyEl = document.getElementById('approval-modal-body');
     
     // Form elements
@@ -65,6 +66,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const addRecurringBtn = document.getElementById('add-recurring-btn');
     const saveRecurringBtn = document.getElementById('save-recurring-btn');
     const deleteRecurringBtn = document.getElementById('delete-recurring-btn');
+    
+    // Quick transaction elements
+    const quickTransactionTitleEl = document.getElementById('quick-transaction-title');
+    const quickTransactionChildIdEl = document.getElementById('quick-transaction-child-id');
+    const quickTransactionDescriptionEl = document.getElementById('quick-transaction-description');
+    const quickTransactionAmountEl = document.getElementById('quick-transaction-amount');
+    const quickTransactionTypeEl = document.getElementById('quick-transaction-type');
+    const quickTransactionAccountEl = document.getElementById('quick-transaction-account');
+    const saveQuickTransactionBtn = document.getElementById('save-quick-transaction-btn');
     
     // Allowance settings elements
     const allowanceSettingsFormEl = document.getElementById('allowance-settings-form');
@@ -157,8 +167,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const response = await fetch(`${API_URL}/transactions`);
         const data = await response.json();
         
-        // Filter for unapproved transactions
-        pendingTransactions = data.data.filter(transaction => !transaction.approved);
+        // Filter for unapproved and non-rejected transactions
+        pendingTransactions = data.data.filter(transaction => !transaction.approved && !transaction.rejected);
         
         // Update badge
         approvalsBadgeEl.textContent = pendingTransactions.length;
@@ -281,9 +291,12 @@ async function loadChildren() {
                 </div>
               </div>
               <div class="card-footer bg-transparent">
-                <div class="w-100">
-                  <button type="button" class="btn btn-outline-success btn-sm w-100 view-child" data-id="${child._id}">
+                <div class="d-grid gap-2">
+                  <button type="button" class="btn btn-outline-success btn-sm view-child" data-id="${child._id}">
                     View Details
+                  </button>
+                  <button type="button" class="btn btn-primary btn-sm add-transaction-btn" data-child-id="${child._id}" data-child-name="${displayName}">
+                    <i class="bi bi-plus-circle me-1"></i>Add Transaction
                   </button>
                 </div>
               </div>
@@ -395,7 +408,7 @@ async function loadChildren() {
     // Add this to the setupEventListeners function in parent-dashboard.js
 // after the loadChildren() function has completed successfully
 
-// Add event listeners to View Details buttons
+// Add event listeners to View Details and Add Transaction buttons
 function addChildButtonEventListeners() {
     // View Details buttons
     document.querySelectorAll('.view-child').forEach(button => {
@@ -403,6 +416,15 @@ function addChildButtonEventListeners() {
         const childId = button.getAttribute('data-id');
         // Navigate to child details page with the child ID
         window.location.href = `/child-detail.html?id=${childId}`;
+      });
+    });
+    
+    // Add Transaction buttons
+    document.querySelectorAll('.add-transaction-btn').forEach(button => {
+      button.addEventListener('click', () => {
+        const childId = button.getAttribute('data-child-id');
+        const childName = button.getAttribute('data-child-name');
+        showQuickTransactionModal(childId, childName);
       });
     });
   }
@@ -757,6 +779,9 @@ function addChildButtonEventListeners() {
       
       // Delete recurring transaction button
       deleteRecurringBtn.addEventListener('click', deleteRecurringTransaction);
+      
+      // Quick transaction save button
+      saveQuickTransactionBtn.addEventListener('click', saveQuickTransaction);
     }
     
     // Update distribution total
@@ -1315,7 +1340,7 @@ function addChildButtonEventListeners() {
           await loadPendingTransactions();
           
           // Success message
-          alert('Transaction rejected and deleted successfully!');
+          alert('Transaction rejected successfully!');
         } else {
           throw new Error(data.error || 'Failed to reject transaction');
         }
@@ -1380,6 +1405,128 @@ function addChildButtonEventListeners() {
           return 'Yearly';
         default:
           return 'Custom';
+      }
+    }
+    
+    // Show quick transaction modal
+    async function showQuickTransactionModal(childId, childName) {
+      try {
+        // Set modal title and child ID
+        quickTransactionTitleEl.textContent = `Add Transaction for ${childName}`;
+        quickTransactionChildIdEl.value = childId;
+        
+        // Reset form
+        document.getElementById('quick-transaction-form').reset();
+        
+        // Load child's accounts
+        const response = await fetch(`${API_URL}/accounts?userId=${childId}`);
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to load accounts');
+        }
+        
+        const accounts = data.data;
+        
+        // Clear existing options
+        quickTransactionAccountEl.innerHTML = '';
+        
+        if (accounts.length === 0) {
+          const option = document.createElement('option');
+          option.textContent = 'No accounts available';
+          quickTransactionAccountEl.appendChild(option);
+          quickTransactionAccountEl.disabled = true;
+          saveQuickTransactionBtn.disabled = true;
+          return;
+        }
+        
+        quickTransactionAccountEl.disabled = false;
+        saveQuickTransactionBtn.disabled = false;
+        
+        // Add options for each account
+        accounts.forEach(account => {
+          const option = document.createElement('option');
+          option.value = account._id;
+          option.textContent = `${account.name} (${capitalizeFirstLetter(account.type)}) - ${formatCurrency(account.balance)}`;
+          quickTransactionAccountEl.appendChild(option);
+        });
+        
+        // Show modal
+        quickTransactionModal.show();
+        
+      } catch (error) {
+        console.error('Error loading accounts for quick transaction:', error);
+        alert('Error loading accounts: ' + error.message);
+      }
+    }
+    
+    // Save quick transaction
+    async function saveQuickTransaction() {
+      try {
+        // Validate form
+        const form = document.getElementById('quick-transaction-form');
+        if (!form.checkValidity()) {
+          form.reportValidity();
+          return;
+        }
+        
+        // Get form values
+        const childId = quickTransactionChildIdEl.value;
+        const description = quickTransactionDescriptionEl.value;
+        const amount = parseFloat(quickTransactionAmountEl.value);
+        const type = quickTransactionTypeEl.value;
+        const accountId = quickTransactionAccountEl.value;
+        
+        if (!childId || !accountId) {
+          alert('Missing required information');
+          return;
+        }
+        
+        // Disable save button and show loading
+        saveQuickTransactionBtn.disabled = true;
+        saveQuickTransactionBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+        
+        // Create transaction
+        const response = await fetch(`${API_URL}/transactions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            description,
+            amount,
+            type,
+            account: accountId,
+            approved: true, // Parent-created transactions are auto-approved
+            approvedBy: currentUser.id
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to create transaction');
+        }
+        
+        // Close modal
+        quickTransactionModal.hide();
+        
+        // Refresh children list to show updated balances
+        await loadChildren();
+        
+        // Refresh pending transactions (in case there are any effects)
+        await loadPendingTransactions();
+        
+        // Success message
+        alert(`Transaction "${description}" created successfully!`);
+        
+      } catch (error) {
+        console.error('Error saving quick transaction:', error);
+        alert(`Error: ${error.message}`);
+      } finally {
+        // Reset button state
+        saveQuickTransactionBtn.disabled = false;
+        saveQuickTransactionBtn.innerHTML = 'Save Transaction';
       }
     }
   });
