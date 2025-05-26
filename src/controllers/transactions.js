@@ -1,28 +1,112 @@
 const Transaction = require('../models/Transaction');
 const Account = require('../models/Account');
 
-// @desc    Get all transactions
+// @desc    Get all transactions with pagination and filtering
 // @route   GET /api/transactions
 // @access  Private
 exports.getTransactions = async (req, res, next) => {
   try {
-    let query;
+    // Build filter object
+    let filter = {};
     
     // Filter by account if provided
     if (req.query.accountId) {
-      query = Transaction.find({ account: req.query.accountId });
-    } else {
-      query = Transaction.find();
+      filter.account = req.query.accountId;
     }
     
-    // Add sort, populate
-    query = query.sort('-date').populate('account');
+    // Filter by user's accounts (ensure users only see their transactions)
+    if (req.query.userId) {
+      const Account = require('../models/Account');
+      const userAccounts = await Account.find({ owner: req.query.userId });
+      const accountIds = userAccounts.map(account => account._id);
+      filter.account = { $in: accountIds };
+    } else {
+      // If no userId provided, get transactions for current user and their children
+      const User = require('../models/User');
+      const currentUser = req.user; // Assuming req.user is set by auth middleware
+      
+      if (currentUser) {
+        let accountOwners = [currentUser._id];
+        
+        // If user is a parent, include their children's accounts
+        if (currentUser.role === 'parent') {
+          const children = await User.find({ parent: currentUser._id });
+          accountOwners = accountOwners.concat(children.map(child => child._id));
+        }
+        
+        const userAccounts = await Account.find({ owner: { $in: accountOwners } });
+        const accountIds = userAccounts.map(account => account._id);
+        filter.account = { $in: accountIds };
+      }
+    }
     
-    const transactions = await query;
+    // Filter by transaction type
+    if (req.query.type) {
+      filter.type = req.query.type;
+    }
+    
+    // Filter by date range
+    if (req.query.startDate || req.query.endDate) {
+      filter.date = {};
+      if (req.query.startDate) {
+        filter.date.$gte = new Date(req.query.startDate);
+      }
+      if (req.query.endDate) {
+        filter.date.$lte = new Date(req.query.endDate);
+      }
+    }
+    
+    // Filter by description (case-insensitive search)
+    if (req.query.search) {
+      filter.description = { $regex: req.query.search, $options: 'i' };
+    }
+    
+    // Filter by approval status
+    if (req.query.approved !== undefined) {
+      filter.approved = req.query.approved === 'true';
+    }
+    
+    // Pagination
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 25;
+    const startIndex = (page - 1) * limit;
+    
+    // Execute query with pagination
+    const total = await Transaction.countDocuments(filter);
+    const transactions = await Transaction.find(filter)
+      .sort('-date')
+      .populate('account')
+      .populate('approvedBy', 'name email')
+      .skip(startIndex)
+      .limit(limit);
+    
+    // Manually populate account owners to ensure it works
+    for (let transaction of transactions) {
+      if (transaction.account && transaction.account.owner) {
+        await transaction.account.populate('owner', 'name firstName lastName');
+      }
+    }
+    
+    // Pagination info
+    const pagination = {};
+    if (startIndex > 0) {
+      pagination.prev = {
+        page: page - 1,
+        limit
+      };
+    }
+    if (startIndex + limit < total) {
+      pagination.next = {
+        page: page + 1,
+        limit
+      };
+    }
     
     res.status(200).json({
       success: true,
       count: transactions.length,
+      total,
+      pagination,
       data: transactions
     });
   } catch (err) {

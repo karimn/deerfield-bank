@@ -44,7 +44,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const saveTransactionBtn = document.getElementById('save-transaction-btn');
     const addAllowanceBtn = document.getElementById('add-allowance-btn');
     const saveAllowanceBtn = document.getElementById('save-allowance-btn');
-    const showAllBtn = document.getElementById('show-all-btn');
     const togglePermissionsBtn = document.getElementById('toggle-permissions-btn');
     
     // Current user and child data
@@ -176,12 +175,6 @@ document.addEventListener('DOMContentLoaded', function() {
       
       // Save allowance button
       saveAllowanceBtn.addEventListener('click', processAllowance);
-      
-      // Show all transactions button
-      showAllBtn.addEventListener('click', () => {
-        // To be implemented - could redirect to a transactions listing page
-        alert('Full transaction history feature coming soon!');
-      });
       
       // Toggle permissions button
       togglePermissionsBtn.addEventListener('click', () => {
