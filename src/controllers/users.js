@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const { canAccessChild } = require('../utils/parentAuth');
 
 // @desc    Get all users
 // @route   GET /api/users
@@ -56,13 +57,21 @@ exports.createUser = async (req, res, next) => {
       name: req.body.name,
       email: req.body.email,
       role: req.body.role || 'child',
-      parent: req.body.parent,
       firstName: req.body.firstName,
       lastName: req.body.lastName,
       dateOfBirth: req.body.dateOfBirth,
       googleId: req.body.googleId,
       phone: req.body.phone
     };
+
+    // Handle multiple parents
+    if (req.body.parents && Array.isArray(req.body.parents)) {
+      userData.parents = req.body.parents;
+    } else if (req.body.parent) {
+      // Support legacy single parent format
+      userData.parents = [req.body.parent];
+      userData.parent = req.body.parent; // Keep for backward compatibility
+    }
     
     // Remove undefined fields
     Object.keys(userData).forEach(key => userData[key] === undefined && delete userData[key]);
@@ -163,6 +172,121 @@ exports.deleteUser = async (req, res, next) => {
     res.status(200).json({
       success: true,
       data: {}
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get children of current parent
+// @route   GET /api/users/children
+// @access  Private/Parent
+exports.getChildren = async (req, res, next) => {
+  try {
+    if (req.user.role !== 'parent') {
+      return res.status(403).json({
+        success: false,
+        error: 'Only parents can access this endpoint'
+      });
+    }
+
+    const children = await User.findChildrenOfParent(req.user.id)
+      .populate('accounts')
+      .select('-googleId -auth0Id');
+
+    res.status(200).json({
+      success: true,
+      count: children.length,
+      data: children
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Add parent to child
+// @route   POST /api/users/:childId/parents
+// @access  Private/Parent (must already be a parent of the child)
+exports.addParentToChild = async (req, res, next) => {
+  try {
+    const { childId } = req.params;
+    const { parentId } = req.body;
+
+    // Check if current user can manage this child
+    if (req.user.role !== 'parent' || !(await canAccessChild(req.user.id, childId))) {
+      return res.status(403).json({
+        success: false,
+        error: 'Not authorized to manage this child'
+      });
+    }
+
+    const child = await User.findById(childId);
+    const newParent = await User.findById(parentId);
+
+    if (!child || child.role !== 'child') {
+      return res.status(404).json({
+        success: false,
+        error: 'Child not found'
+      });
+    }
+
+    if (!newParent || newParent.role !== 'parent') {
+      return res.status(404).json({
+        success: false,
+        error: 'Parent not found'
+      });
+    }
+
+    await child.addParent(parentId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Parent added successfully',
+      data: child
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Remove parent from child
+// @route   DELETE /api/users/:childId/parents/:parentId
+// @access  Private/Parent (must already be a parent of the child)
+exports.removeParentFromChild = async (req, res, next) => {
+  try {
+    const { childId, parentId } = req.params;
+
+    // Check if current user can manage this child
+    if (req.user.role !== 'parent' || !(await canAccessChild(req.user.id, childId))) {
+      return res.status(403).json({
+        success: false,
+        error: 'Not authorized to manage this child'
+      });
+    }
+
+    const child = await User.findById(childId);
+    if (!child || child.role !== 'child') {
+      return res.status(404).json({
+        success: false,
+        error: 'Child not found'
+      });
+    }
+
+    // Prevent removing the last parent
+    const allParents = child.getAllParents();
+    if (allParents.length <= 1) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot remove the last parent from a child'
+      });
+    }
+
+    await child.removeParent(parentId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Parent removed successfully',
+      data: child
     });
   } catch (err) {
     next(err);
