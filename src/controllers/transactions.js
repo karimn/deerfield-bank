@@ -20,6 +20,24 @@ exports.getTransactions = async (req, res, next) => {
       const userAccounts = await Account.find({ owner: req.query.userId });
       const accountIds = userAccounts.map(account => account._id);
       filter.account = { $in: accountIds };
+    } else {
+      // If no userId provided, get transactions for current user and their children
+      const User = require('../models/User');
+      const currentUser = req.user; // Assuming req.user is set by auth middleware
+      
+      if (currentUser) {
+        let accountOwners = [currentUser._id];
+        
+        // If user is a parent, include their children's accounts
+        if (currentUser.role === 'parent') {
+          const children = await User.find({ parent: currentUser._id });
+          accountOwners = accountOwners.concat(children.map(child => child._id));
+        }
+        
+        const userAccounts = await Account.find({ owner: { $in: accountOwners } });
+        const accountIds = userAccounts.map(account => account._id);
+        filter.account = { $in: accountIds };
+      }
     }
     
     // Filter by transaction type

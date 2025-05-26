@@ -117,12 +117,15 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             showLoading(true);
             
-            // Build query parameters
+            // Build query parameters  
             const params = new URLSearchParams({
-                userId: currentUser.id,
                 page: currentPage,
                 limit: pageSizeSelect.value
             });
+            
+            // Backend will automatically filter based on user role:
+            // - Parents see their own + children's transactions
+            // - Children see only their own transactions
             
             // Add filters
             if (searchInput.value.trim()) {
@@ -315,9 +318,10 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Build query parameters for export (all results, no pagination)
             const params = new URLSearchParams({
-                userId: currentUser.id,
                 limit: 10000 // Large limit to get all results
             });
+            
+            // Backend automatically handles parent-child filtering
             
             // Add current filters
             if (searchInput.value.trim()) {
