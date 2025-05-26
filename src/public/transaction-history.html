@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Transaction History - Deerfield Bank</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    .transaction-row:hover {
+      background-color: var(--bs-light);
+    }
+    .filter-card {
+      background-color: #f8f9fa;
+      border: 1px solid #e9ecef;
+    }
+    .transaction-amount.positive {
+      color: #198754;
+      font-weight: 600;
+    }
+    .transaction-amount.negative {
+      color: #dc3545;
+      font-weight: 600;
+    }
+    .pagination-info {
+      color: #6c757d;
+      font-size: 0.9rem;
+    }
+    .export-btn {
+      border: 1px solid #dee2e6;
+    }
+    .loading-spinner {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container">
+      <a class="navbar-brand" href="/">
+        <i class="bi bi-piggy-bank me-2"></i>
+        Deerfield Bank
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item">
+            <a class="nav-link" href="/dashboard.html">Dashboard</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link active" href="/transaction-history.html">Transaction History</a>
+          </li>
+        </ul>
+        <ul class="navbar-nav">
+          <li class="nav-item">
+            <a class="nav-link" href="/profile.html">Profile</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/auth/logout">Logout</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <div class="container mt-4">
+    <!-- Header -->
+    <div class="row mb-4">
+      <div class="col-md-8">
+        <h1 class="display-5 fw-bold">Transaction History</h1>
+        <p class="text-muted">View and filter all your transactions</p>
+      </div>
+      <div class="col-md-4 text-md-end">
+        <button class="btn btn-outline-primary export-btn" id="export-btn">
+          <i class="bi bi-download me-2"></i>Export CSV
+        </button>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card filter-card mb-4">
+      <div class="card-body">
+        <h6 class="card-title mb-3">
+          <i class="bi bi-funnel me-2"></i>Filters
+        </h6>
+        <form id="filter-form">
+          <div class="row g-3">
+            <!-- Search -->
+            <div class="col-md-4">
+              <label for="search" class="form-label">Search Description</label>
+              <input type="text" class="form-control" id="search" placeholder="Search transactions...">
+            </div>
+            
+            <!-- Transaction Type -->
+            <div class="col-md-2">
+              <label for="type" class="form-label">Type</label>
+              <select class="form-select" id="type">
+                <option value="">All Types</option>
+                <option value="deposit">Deposit</option>
+                <option value="withdrawal">Withdrawal</option>
+                <option value="interest">Interest</option>
+                <option value="subscription">Subscription</option>
+                <option value="transfer">Transfer</option>
+              </select>
+            </div>
+            
+            <!-- Account -->
+            <div class="col-md-2">
+              <label for="account" class="form-label">Account</label>
+              <select class="form-select" id="account">
+                <option value="">All Accounts</option>
+              </select>
+            </div>
+            
+            <!-- Start Date -->
+            <div class="col-md-2">
+              <label for="start-date" class="form-label">From Date</label>
+              <input type="date" class="form-control" id="start-date">
+            </div>
+            
+            <!-- End Date -->
+            <div class="col-md-2">
+              <label for="end-date" class="form-label">To Date</label>
+              <input type="date" class="form-control" id="end-date">
+            </div>
+          </div>
+          
+          <div class="row mt-3">
+            <div class="col-12">
+              <button type="submit" class="btn btn-primary me-2">
+                <i class="bi bi-search me-1"></i>Apply Filters
+              </button>
+              <button type="button" class="btn btn-outline-secondary" id="clear-filters">
+                <i class="bi bi-x-circle me-1"></i>Clear Filters
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Results Info -->
+    <div class="row mb-3">
+      <div class="col-md-6">
+        <div class="pagination-info" id="results-info">
+          Loading transactions...
+        </div>
+      </div>
+      <div class="col-md-6 text-md-end">
+        <div class="pagination-info">
+          Show: 
+          <select class="form-select form-select-sm d-inline-block w-auto" id="page-size">
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+          per page
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div class="text-center loading-spinner" id="loading-spinner">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
+
+    <!-- Transactions Table -->
+    <div class="card">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Date</th>
+                <th>Description</th>
+                <th>Account</th>
+                <th>Type</th>
+                <th class="text-end">Amount</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="transactions-table-body">
+              <!-- Transactions will be populated here -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    <nav aria-label="Transaction pagination" class="mt-4">
+      <ul class="pagination justify-content-center" id="pagination">
+        <!-- Pagination will be populated here -->
+      </ul>
+    </nav>
+
+    <!-- Empty State -->
+    <div class="text-center py-5 d-none" id="empty-state">
+      <i class="bi bi-receipt text-muted" style="font-size: 3rem;"></i>
+      <h5 class="text-muted mt-3">No transactions found</h5>
+      <p class="text-muted">Try adjusting your filters or date range</p>
+    </div>
+  </div>
+
+  <!-- Bootstrap & JavaScript -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="js/transaction-history.js"></script>
+</body>
+</html>
