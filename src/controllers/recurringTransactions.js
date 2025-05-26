@@ -2,6 +2,7 @@ const RecurringTransaction = require('../models/RecurringTransaction');
 const Account = require('../models/Account');
 const Transaction = require('../models/Transaction');
 const User = require('../models/User');
+const { canAccessChild, getAccessibleChildren } = require('../utils/parentAuth');
 
 // @desc    Get all recurring transactions
 // @route   GET /api/recurring
@@ -27,8 +28,8 @@ exports.getRecurringTransactions = async (req, res, next) => {
     } else if (req.user.role === 'parent') {
       // If no specific user filter was provided, get all children
       if (!req.query.userId) {
-        // Find all children of this parent
-        const children = await User.find({ parent: req.user.id });
+        // Find all children of this parent (supports multiple parents)
+        const children = await getAccessibleChildren(req.user.id);
         const childIds = children.map(child => child._id);
         // Add parent's own ID
         childIds.push(req.user.id);
@@ -81,9 +82,9 @@ exports.getRecurringTransaction = async (req, res, next) => {
 
     if (req.user.role === 'parent' && 
         recurringTransaction.user.toString() !== req.user.id) {
-      // Check if this recurring transaction belongs to one of their children
-      const child = await User.findById(recurringTransaction.user);
-      if (!child || child.parent.toString() !== req.user.id) {
+      // Check if this recurring transaction belongs to one of their children (multiple parents support)
+      const hasAccess = await canAccessChild(req.user.id, recurringTransaction.user);
+      if (!hasAccess) {
         return res.status(403).json({
           success: false,
           error: 'Not authorized to access this recurring transaction'
@@ -147,9 +148,9 @@ exports.createRecurringTransaction = async (req, res, next) => {
     }
 
     if (req.user.role === 'parent' && targetUser !== req.user.id) {
-      // Check if this is their child
-      const child = await User.findById(targetUser);
-      if (!child || child.parent.toString() !== req.user.id) {
+      // Check if this is their child (multiple parents support)
+      const hasAccess = await canAccessChild(req.user.id, targetUser);
+      if (!hasAccess) {
         return res.status(403).json({
           success: false,
           error: 'Not authorized to create recurring transactions for this user'
