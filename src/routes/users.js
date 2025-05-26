@@ -4,7 +4,10 @@ const {
   getUser,
   createUser,
   updateUser,
-  deleteUser
+  deleteUser,
+  getChildren,
+  addParentToChild,
+  removeParentFromChild
 } = require('../controllers/users');
 const { ensureAuth, ensureAdmin, ensureOwnerOrAdmin } = require('../middleware/auth');
 
@@ -18,5 +21,15 @@ router.route('/:id')
   .get(ensureOwnerOrAdmin, getUser)
   .put(ensureOwnerOrAdmin, updateUser)
   .delete(ensureAdmin, deleteUser);
+
+// Multiple parent management routes
+router.route('/children')
+  .get(getChildren);
+
+router.route('/:childId/parents')
+  .post(addParentToChild);
+
+router.route('/:childId/parents/:parentId')
+  .delete(removeParentFromChild);
 
 module.exports = router;

@@ -41,12 +41,14 @@ const UserSchema = new mongoose.Schema(
       enum: ['parent', 'child'],
       default: 'child'
     },
+    parents: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }],
+    // Legacy field for backward compatibility - will be migrated to parents array
     parent: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: function() {
-        return this.role === 'child';
-      }
+      ref: 'User'
     }
   },
   {
@@ -63,5 +65,42 @@ UserSchema.virtual('accounts', {
   foreignField: 'owner',
   justOne: false
 });
+
+// Helper methods for managing parents
+UserSchema.methods.addParent = function(parentId) {
+  if (!this.parents.includes(parentId)) {
+    this.parents.push(parentId);
+  }
+  return this.save();
+};
+
+UserSchema.methods.removeParent = function(parentId) {
+  this.parents = this.parents.filter(id => !id.equals(parentId));
+  return this.save();
+};
+
+UserSchema.methods.hasParent = function(parentId) {
+  return this.parents.some(id => id.equals(parentId));
+};
+
+UserSchema.methods.getAllParents = function() {
+  // Include both new parents array and legacy parent field
+  const allParents = [...this.parents];
+  if (this.parent && !allParents.some(id => id.equals(this.parent))) {
+    allParents.push(this.parent);
+  }
+  return allParents;
+};
+
+// Static method to find children of a parent
+UserSchema.statics.findChildrenOfParent = function(parentId) {
+  return this.find({
+    $or: [
+      { parents: parentId },
+      { parent: parentId } // Include legacy parent field
+    ],
+    role: 'child'
+  });
+};
 
 module.exports = mongoose.model('User', UserSchema);
