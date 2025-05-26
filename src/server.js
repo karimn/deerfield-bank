@@ -57,7 +57,16 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Auth routes
 app.use('/auth', require('./routes/auth'));
 
-// Public automation endpoint (no auth required for automated processing)
+// Public automation endpoints (no auth required for automated processing)
+app.get('/api/automation/health', (req, res) => {
+  res.json({ 
+    success: true, 
+    message: 'Automation API is working',
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV
+  });
+});
+
 app.post('/api/automation/process-recurring', require('./controllers/recurringTransactions').processRecurringTransactions);
 
 // API routes - protect all API routes with ensureAuth
