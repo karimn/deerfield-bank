@@ -9,6 +9,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const accountsListEl = document.getElementById('accounts-list');
     const transactionsTableEl = document.getElementById('transactions-table');
     const subscriptionsContainerEl = document.getElementById('subscriptions-container');
+    const allowanceInfoEl = document.getElementById('allowance-info');
+    const allowanceCardEl = document.getElementById('allowance-card');
     
     // Modal elements
     const addAccountModal = new bootstrap.Modal(document.getElementById('addAccountModal'));
@@ -118,10 +120,13 @@ document.addEventListener('DOMContentLoaded', function() {
         // 6. Load subscriptions
         await loadSubscriptions();
         
-        // 7. Set up event listeners
+        // 7. Load allowance information
+        await loadAllowance();
+        
+        // 8. Set up event listeners
         setupEventListeners();
         
-        // 8. Set up distribution total update
+        // 9. Set up distribution total update
         setupDistributionUpdate();
         
       } catch (error) {
@@ -158,6 +163,17 @@ document.addEventListener('DOMContentLoaded', function() {
         calculateAgeBasedAllowance(); // Calculate the age-based amount when modal opens
         addAllowanceModal.show();
       });
+      
+      // Edit allowance button
+      const editAllowanceBtn = document.getElementById('edit-allowance-btn');
+      if (editAllowanceBtn) {
+        editAllowanceBtn.addEventListener('click', () => {
+          allowanceFormEl.reset();
+          populateDistributionInputs();
+          calculateAgeBasedAllowance(); // Calculate the age-based amount when modal opens
+          addAllowanceModal.show();
+        });
+      }
       
       // Age-based calculation checkbox
       const useAgeFormulaEl = document.getElementById('use-age-formula');
@@ -560,6 +576,83 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     }
     
+    // Load allowance information
+    async function loadAllowance() {
+      try {
+        const response = await fetch(`${API_URL}/recurring?userId=${childId}&type=allowance`);
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to load allowance');
+        }
+        
+        const allowances = data.data;
+        
+        if (allowances.length === 0) {
+          // No allowance found, hide the card and update the button text
+          allowanceCardEl.style.display = 'none';
+          addAllowanceBtn.textContent = 'Add Allowance';
+          return;
+        }
+        
+        // Show allowance card and get the allowance (should only be one due to our constraint)
+        const allowance = allowances[0];
+        allowanceCardEl.style.display = 'block';
+        
+        // Calculate next payment date
+        const nextDate = new Date(allowance.nextDate);
+        const now = new Date();
+        const isOverdue = nextDate < now;
+        
+        // Format distribution information
+        const distribution = allowance.distribution || {};
+        const distributionText = Object.keys(distribution)
+          .filter(key => distribution[key] > 0)
+          .map(key => `${capitalizeFirstLetter(key)}: ${distribution[key]}%`)
+          .join(', ');
+        
+        allowanceInfoEl.innerHTML = `
+          <div class="row">
+            <div class="col-6">
+              <h6 class="text-muted mb-1">Amount</h6>
+              <div class="h4 text-success mb-3">${formatCurrency(allowance.amount)}</div>
+            </div>
+            <div class="col-6">
+              <h6 class="text-muted mb-1">Frequency</h6>
+              <div class="mb-3">${capitalizeFirstLetter(allowance.frequency)}</div>
+            </div>
+          </div>
+          <div class="mb-3">
+            <h6 class="text-muted mb-1">Distribution</h6>
+            <div class="small">${distributionText || 'No distribution set'}</div>
+          </div>
+          <div class="mb-3">
+            <h6 class="text-muted mb-1">Next Payment</h6>
+            <div class="small ${isOverdue ? 'text-danger' : 'text-muted'}">
+              ${nextDate.toLocaleDateString()} ${isOverdue ? '(Overdue)' : ''}
+            </div>
+          </div>
+          <div>
+            <h6 class="text-muted mb-1">Status</h6>
+            <span class="badge ${allowance.active ? 'bg-success' : 'bg-secondary'}">
+              ${allowance.active ? 'Active' : 'Inactive'}
+            </span>
+          </div>
+        `;
+        
+        // Update button text to indicate allowance exists
+        addAllowanceBtn.textContent = 'Replace Allowance';
+        
+      } catch (error) {
+        console.error('Error loading allowance:', error);
+        allowanceInfoEl.innerHTML = `
+          <div class="alert alert-danger">
+            Error loading allowance information.
+          </div>
+        `;
+      }
+    }
+    
     // Populate account dropdown in transaction modal
     function populateAccountDropdown() {
       transactionAccountEl.innerHTML = childAccounts.map(account => 
@@ -678,6 +771,21 @@ document.addEventListener('DOMContentLoaded', function() {
     // Process allowance
     async function processAllowance() {
       try {
+        // First, check if there's an existing allowance and delete it
+        const existingResponse = await fetch(`${API_URL}/recurring?userId=${childId}&type=allowance`);
+        const existingData = await existingResponse.json();
+        
+        if (existingData.success && existingData.data.length > 0) {
+          // Delete existing allowance
+          const existingAllowance = existingData.data[0];
+          const deleteResponse = await fetch(`${API_URL}/recurring/${existingAllowance._id}`, {
+            method: 'DELETE'
+          });
+          
+          if (!deleteResponse.ok) {
+            throw new Error('Failed to remove existing allowance');
+          }
+        }
         // Get the amount - either direct value or from the age formula
         let amount = parseFloat(allowanceAmountEl.value);
         const useAgeFormula = document.getElementById('use-age-formula')?.checked;
@@ -815,6 +923,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Refresh data
         await loadChildAccounts(childId);
         await loadTransactions();
+        await loadAllowance(); // Refresh allowance display
         
         // Success message
         alert(`Allowance processed successfully!${recurring ? ' Recurring allowance has been scheduled.' : ''}`);

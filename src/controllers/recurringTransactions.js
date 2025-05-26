@@ -157,7 +157,7 @@ exports.createRecurringTransaction = async (req, res, next) => {
       }
     }
 
-    // For allowance type, validate distribution
+    // For allowance type, validate distribution and check for existing allowance
     if (type === 'allowance') {
       if (!distribution) {
         return res.status(400).json({
@@ -174,6 +174,20 @@ exports.createRecurringTransaction = async (req, res, next) => {
         return res.status(400).json({
           success: false,
           error: 'Distribution percentages must add up to 100%'
+        });
+      }
+
+      // Check if user already has an allowance
+      const existingAllowance = await RecurringTransaction.findOne({
+        user: targetUser,
+        type: 'allowance',
+        active: true
+      });
+
+      if (existingAllowance) {
+        return res.status(400).json({
+          success: false,
+          error: 'User already has an active allowance. Only one allowance per user is permitted.'
         });
       }
     }

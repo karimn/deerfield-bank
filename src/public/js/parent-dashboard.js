@@ -55,6 +55,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Button elements
     const addChildBtn = document.getElementById('add-child-btn');
     const saveChildBtn = document.getElementById('save-child-btn');
+    const processRecurringBtn = document.getElementById('process-recurring-btn');
     const processAllowanceBtn = document.getElementById('process-allowance-btn');
     const calculateInterestBtn = document.getElementById('calculate-interest-btn');
     const processSubscriptionsBtn = document.getElementById('process-subscriptions-btn');
@@ -682,6 +683,9 @@ function addChildButtonEventListeners() {
       // Save child button
       saveChildBtn.addEventListener('click', saveChild);
       
+      // Process all recurring transactions button
+      processRecurringBtn.addEventListener('click', processRecurringTransactions);
+      
       // Process allowance button
       processAllowanceBtn.addEventListener('click', processAllowance);
       
@@ -840,6 +844,60 @@ function addChildButtonEventListeners() {
       } catch (error) {
         console.error('Error saving child:', error);
         alert(`Error: ${error.message}`);
+      }
+    }
+    
+    // Process all recurring transactions
+    async function processRecurringTransactions() {
+      try {
+        if (!confirm('Are you sure you want to process all recurring transactions? This will process allowances, subscriptions, and other recurring items that are due.')) {
+          return;
+        }
+        
+        // Show loading state
+        processRecurringBtn.disabled = true;
+        processRecurringBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Processing...';
+        
+        const response = await fetch(`${API_URL}/recurring/process`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          const { processed, errors } = data.data;
+          let message = `Successfully processed ${processed.length} recurring transactions.`;
+          
+          if (errors.length > 0) {
+            message += `\n\nErrors occurred with ${errors.length} transactions:`;
+            errors.forEach(error => {
+              message += `\n- ${error.name}: ${error.error}`;
+            });
+          }
+          
+          alert(message);
+          
+          // Refresh the recurring transactions list
+          await loadRecurringTransactions();
+          
+          // Optionally refresh the entire page to show updated balances
+          if (processed.length > 0) {
+            location.reload();
+          }
+        } else {
+          throw new Error(data.error || 'Failed to process recurring transactions');
+        }
+        
+      } catch (error) {
+        console.error('Error processing recurring transactions:', error);
+        alert(`Error: ${error.message}`);
+      } finally {
+        // Reset button state
+        processRecurringBtn.disabled = false;
+        processRecurringBtn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Process All Recurring Transactions';
       }
     }
     

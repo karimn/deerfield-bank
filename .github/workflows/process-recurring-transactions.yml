@@ -1,0 +1,65 @@
+name: Process Recurring Transactions
+
+on:
+  # Run daily at 6 AM UTC (2 AM EDT, 1 AM EST)
+  schedule:
+    - cron: '0 6 * * *'
+  
+  # Allow manual trigger for testing
+  workflow_dispatch:
+
+jobs:
+  process-transactions:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Process Recurring Transactions
+      run: |
+        echo "Processing recurring transactions at $(date)"
+        
+        # Make API call to process recurring transactions
+        response=$(curl -s -X POST \
+          -H "Content-Type: application/json" \
+          -w "\nHTTP_STATUS:%{http_code}" \
+          "${{ secrets.APP_URL }}/api/recurring/process")
+        
+        # Extract HTTP status code
+        http_status=$(echo "$response" | grep "HTTP_STATUS:" | cut -d: -f2)
+        response_body=$(echo "$response" | sed '/HTTP_STATUS:/d')
+        
+        echo "Response: $response_body"
+        echo "HTTP Status: $http_status"
+        
+        # Check if request was successful
+        if [ "$http_status" -eq 200 ]; then
+          echo "✅ Successfully processed recurring transactions"
+          echo "$response_body"
+        else
+          echo "❌ Failed to process recurring transactions (HTTP $http_status)"
+          echo "$response_body"
+          exit 1
+        fi
+    
+    - name: Process Legacy Allowances (if needed)
+      run: |
+        echo "Processing legacy allowances at $(date)"
+        
+        # Make API call to process legacy allowances (backup)
+        response=$(curl -s -X POST \
+          -H "Content-Type: application/json" \
+          -w "\nHTTP_STATUS:%{http_code}" \
+          "${{ secrets.APP_URL }}/api/allowance/process" || echo "HTTP_STATUS:404")
+        
+        # Extract HTTP status code
+        http_status=$(echo "$response" | grep "HTTP_STATUS:" | cut -d: -f2)
+        response_body=$(echo "$response" | sed '/HTTP_STATUS:/d')
+        
+        echo "Legacy allowance response: $response_body"
+        echo "Legacy allowance HTTP Status: $http_status"
+        
+        # Legacy endpoint might not exist, so we don't fail on this
+        if [ "$http_status" -eq 200 ]; then
+          echo "✅ Successfully processed legacy allowances"
+        else
+          echo "ℹ️  Legacy allowance endpoint not available or failed (HTTP $http_status) - this is expected if using new recurring system"
+        fi
