@@ -21,7 +21,7 @@ jobs:
         response=$(curl -s -X POST \
           -H "Content-Type: application/json" \
           -w "\nHTTP_STATUS:%{http_code}" \
-          "${{ secrets.APP_URL }}/api/recurring/process")
+          "${{ secrets.APP_URL }}/api/automation/process-recurring")
         
         # Extract HTTP status code
         http_status=$(echo "$response" | grep "HTTP_STATUS:" | cut -d: -f2)

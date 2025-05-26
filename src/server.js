@@ -57,6 +57,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Auth routes
 app.use('/auth', require('./routes/auth'));
 
+// Public automation endpoint (no auth required for automated processing)
+app.post('/api/automation/process-recurring', require('./controllers/recurringTransactions').processRecurringTransactions);
+
 // API routes - protect all API routes with ensureAuth
 app.use('/api/users', ensureAuth, require('./routes/users'));
 app.use('/api/accounts', ensureAuth, require('./routes/accounts'));
