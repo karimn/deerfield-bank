@@ -6,6 +6,8 @@
   <title>Parent Dashboard - Deerfield Bank</title>
   <!-- Bootstrap CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
   <style>
     body {
       padding-top: 2rem;
@@ -94,6 +96,10 @@
           </div>
           <div class="card-body">
             <div class="d-grid gap-2">
+              <button class="btn btn-primary" id="process-recurring-btn">
+                <i class="bi bi-arrow-repeat me-1"></i>Process All Recurring Transactions
+              </button>
+              <hr>
               <button class="btn btn-outline-primary" id="process-allowance-btn">
                 Process Weekly Allowance
               </button>

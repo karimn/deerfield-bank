@@ -9,7 +9,11 @@ cron.schedule('0 0 * * *', async () => {
   try {
     console.log('Processing recurring transactions');
     // Make API call to the recurring transactions processing endpoint
-    const response = await axios.post('http://localhost:5000/api/recurring/process');
+    const baseUrl = process.env.NODE_ENV === 'production' 
+      ? process.env.PRODUCTION_URL || 'https://deerfield-bank.vercel.app'
+      : 'http://localhost:5000';
+    
+    const response = await axios.post(`${baseUrl}/api/recurring/process`);
     
     const { processed, errors } = response.data;
     console.log(`Processed ${processed} recurring transactions with ${errors} errors`);
@@ -25,7 +29,10 @@ cron.schedule('0 0 * * *', async () => {
 cron.schedule('0 0 * * 0', async () => {
   try {
     console.log('Running legacy weekly allowance job');
-    await axios.post('http://localhost:5000/api/allowance/process');
+    const baseUrl = process.env.NODE_ENV === 'production' 
+      ? process.env.PRODUCTION_URL || 'https://deerfield-bank.vercel.app'
+      : 'http://localhost:5000';
+    await axios.post(`${baseUrl}/api/allowance/process`);
   } catch (error) {
     console.error('Error processing weekly allowance:', error.message);
   }
@@ -35,7 +42,10 @@ cron.schedule('0 0 * * 0', async () => {
 cron.schedule('0 0 1 * *', async () => {
   try {
     console.log('Running legacy monthly interest calculation');
-    await axios.post('http://localhost:5000/api/interest/calculate');
+    const baseUrl = process.env.NODE_ENV === 'production' 
+      ? process.env.PRODUCTION_URL || 'https://deerfield-bank.vercel.app'
+      : 'http://localhost:5000';
+    await axios.post(`${baseUrl}/api/interest/calculate`);
   } catch (error) {
     console.error('Error calculating interest:', error.message);
   }
