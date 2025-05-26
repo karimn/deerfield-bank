@@ -75,17 +75,17 @@ exports.getTransactions = async (req, res, next) => {
     const total = await Transaction.countDocuments(filter);
     const transactions = await Transaction.find(filter)
       .sort('-date')
-      .populate({
-        path: 'account',
-        select: 'name type owner',
-        populate: {
-          path: 'owner',
-          select: 'name firstName lastName'
-        }
-      })
+      .populate('account')
       .populate('approvedBy', 'name email')
       .skip(startIndex)
       .limit(limit);
+    
+    // Manually populate account owners to ensure it works
+    for (let transaction of transactions) {
+      if (transaction.account && transaction.account.owner) {
+        await transaction.account.populate('owner', 'name firstName lastName');
+      }
+    }
     
     // Pagination info
     const pagination = {};
