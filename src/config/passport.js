@@ -1,45 +1,46 @@
 const passport = require('passport');
-const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const Auth0Strategy = require('passport-auth0');
 const User = require('../models/User');
 
 module.exports = function() {
-  passport.use(new GoogleStrategy({
-    clientID: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: '/auth/google/callback'
+  passport.use(new Auth0Strategy({
+    domain: process.env.AUTH0_DOMAIN,
+    clientID: process.env.AUTH0_CLIENT_ID,
+    clientSecret: process.env.AUTH0_CLIENT_SECRET,
+    callbackURL: process.env.AUTH0_CALLBACK_URL || '/auth/auth0/callback'
   }, 
-  async (accessToken, refreshToken, profile, done) => {
+  async (accessToken, refreshToken, extraParams, profile, done) => {
     try {
-      console.log('Google auth callback triggered');
+      console.log('Auth0 callback triggered');
       console.log('Profile:', profile.displayName, profile.emails[0].value);
       
-      // Check if user already exists with Google ID
-      let user = await User.findOne({ googleId: profile.id });
+      // Check if user already exists with Auth0 ID
+      let user = await User.findOne({ auth0Id: profile.id });
       
       if (user) {
-        // User exists with this Google ID, return the user
-        console.log('Existing user found with Google ID:', user.name);
+        // User exists with this Auth0 ID, return the user
+        console.log('Existing user found with Auth0 ID:', user.name);
         return done(null, user);
       }
       
-      // If no user with this Google ID, check if a user exists with the email
+      // If no user with this Auth0 ID, check if a user exists with the email
       user = await User.findOne({ email: profile.emails[0].value });
       
       if (user) {
-        // Email exists but not linked to Google, update the user
-        console.log('Updating existing user with Google ID');
-        user.googleId = profile.id;
+        // Email exists but not linked to Auth0, update the user
+        console.log('Updating existing user with Auth0 ID');
+        user.auth0Id = profile.id;
         await user.save();
         return done(null, user);
       }
       
-      // No user found with this Google ID or email
+      // No user found with this Auth0 ID or email
       // Instead of creating a new user, we'll return an error
-      console.log('No existing account found for this Google user');
+      console.log('No existing account found for this Auth0 user');
       return done(null, false, { message: 'No account exists for this email. Please contact an administrator to create an account.' });
       
     } catch (err) {
-      console.error('Error in Google strategy:', err);
+      console.error('Error in Auth0 strategy:', err);
       return done(err, null);
     }
   }));

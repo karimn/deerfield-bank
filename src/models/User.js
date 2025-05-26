@@ -31,7 +31,7 @@ const UserSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
-    googleId: {
+    auth0Id: {
       type: String,
       unique: true,
       sparse: true

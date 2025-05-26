@@ -2,18 +2,18 @@ const express = require('express');
 const passport = require('passport');
 const router = express.Router();
 
-// @route   GET /auth/google
-// @desc    Authenticate with Google
+// @route   GET /auth/auth0
+// @desc    Authenticate with Auth0
 // @access  Public
-router.get('/google', 
-  passport.authenticate('google', { scope: ['profile', 'email'] })
+router.get('/auth0', 
+  passport.authenticate('auth0', { scope: 'openid email profile' })
 );
 
-// @route   GET /auth/google/callback
-// @desc    Google auth callback
+// @route   GET /auth/auth0/callback
+// @desc    Auth0 auth callback
 // @access  Public
-router.get('/google/callback', 
-  passport.authenticate('google', { 
+router.get('/auth0/callback', 
+  passport.authenticate('auth0', { 
     failureRedirect: '/auth-failed.html',
     failureMessage: true 
   }),

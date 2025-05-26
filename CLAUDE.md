@@ -8,12 +8,15 @@
 - **Platform**: Vercel (configured with vercel.json)
 - **Configuration**: src/vercel.json handles routing for Node.js serverless functions
 - **Database**: MongoDB (separate dev/prod URIs configured in db.js)
+- **Authentication**: Auth0 (replaces Google OAuth)
 - **Environment Variables needed for production**:
   - `NODE_ENV=production`
   - `MONGO_URI_PROD=<mongodb_connection_string>`
   - `SESSION_SECRET=<random_string>`
-  - `GOOGLE_CLIENT_ID=<google_oauth_client_id>`
-  - `GOOGLE_CLIENT_SECRET=<google_oauth_secret>`
+  - `AUTH0_DOMAIN=<your_auth0_domain>`
+  - `AUTH0_CLIENT_ID=<auth0_client_id>`
+  - `AUTH0_CLIENT_SECRET=<auth0_client_secret>`
+  - `AUTH0_CALLBACK_URL=<https://your-domain.vercel.app/auth/auth0/callback>`
 
 ## Code Style Guidelines
 
