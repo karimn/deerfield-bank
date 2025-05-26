@@ -13,6 +13,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('search');
     const typeSelect = document.getElementById('type');
     const accountSelect = document.getElementById('account');
+    const childSelect = document.getElementById('child');
+    const childFilterContainer = document.getElementById('child-filter-container');
     const startDateInput = document.getElementById('start-date');
     const endDateInput = document.getElementById('end-date');
     const clearFiltersBtn = document.getElementById('clear-filters');
@@ -40,8 +42,9 @@ document.addEventListener('DOMContentLoaded', function() {
             
             currentUser = authData.user;
             
-            // Load user accounts for filter dropdown
+            // Load user accounts and children for filter dropdowns
             await loadUserAccounts();
+            await loadChildren();
             
             // Load initial transactions
             await loadTransactions();
@@ -113,6 +116,38 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    async function loadChildren() {
+        try {
+            // Only show child filter for parents
+            if (currentUser.role === 'parent') {
+                childFilterContainer.style.display = 'block';
+                
+                const response = await fetch(`${API_URL}/users`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Clear existing options except "All Children"
+                    childSelect.innerHTML = '<option value="">All Children</option>';
+                    
+                    // Add children
+                    data.data.forEach(user => {
+                        if (user.role === 'child' && user.parent === currentUser.id) {
+                            const option = document.createElement('option');
+                            option.value = user._id;
+                            const displayName = user.firstName && user.lastName 
+                                ? `${user.firstName} ${user.lastName}` 
+                                : user.name;
+                            option.textContent = displayName;
+                            childSelect.appendChild(option);
+                        }
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error loading children:', error);
+        }
+    }
+    
     async function loadTransactions() {
         try {
             showLoading(true);
@@ -136,6 +171,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             if (accountSelect.value) {
                 params.append('accountId', accountSelect.value);
+            }
+            if (childSelect.value) {
+                params.append('userId', childSelect.value);
             }
             if (startDateInput.value) {
                 params.append('startDate', startDateInput.value);
@@ -201,9 +239,17 @@ document.addEventListener('DOMContentLoaded', function() {
             // Capitalize transaction type
             const typeText = transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1);
             
+            // Get user display name
+            const userDisplayName = transaction.account?.owner 
+                ? (transaction.account.owner.firstName && transaction.account.owner.lastName 
+                    ? `${transaction.account.owner.firstName} ${transaction.account.owner.lastName}`
+                    : transaction.account.owner.name)
+                : 'Unknown User';
+            
             row.innerHTML = `
                 <td>${formattedDate}</td>
                 <td>${transaction.description || 'N/A'}</td>
+                <td>${userDisplayName}</td>
                 <td>${transaction.account?.name || 'Unknown Account'}</td>
                 <td>${typeText}</td>
                 <td class="text-end">
@@ -333,6 +379,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (accountSelect.value) {
                 params.append('accountId', accountSelect.value);
             }
+            if (childSelect.value) {
+                params.append('userId', childSelect.value);
+            }
             if (startDateInput.value) {
                 params.append('startDate', startDateInput.value);
             }
@@ -358,17 +407,26 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function downloadCSV(transactions) {
-        const headers = ['Date', 'Description', 'Account', 'Type', 'Amount', 'Status'];
+        const headers = ['Date', 'Description', 'User', 'Account', 'Type', 'Amount', 'Status'];
         const csvContent = [
             headers.join(','),
-            ...transactions.map(transaction => [
-                new Date(transaction.date).toLocaleDateString(),
-                `"${transaction.description || 'N/A'}"`,
-                `"${transaction.account?.name || 'Unknown Account'}"`,
-                transaction.type,
-                transaction.amount,
-                transaction.approved ? 'Approved' : 'Pending'
-            ].join(','))
+            ...transactions.map(transaction => {
+                const userDisplayName = transaction.account?.owner 
+                    ? (transaction.account.owner.firstName && transaction.account.owner.lastName 
+                        ? `${transaction.account.owner.firstName} ${transaction.account.owner.lastName}`
+                        : transaction.account.owner.name)
+                    : 'Unknown User';
+                
+                return [
+                    new Date(transaction.date).toLocaleDateString(),
+                    `"${transaction.description || 'N/A'}"`,
+                    `"${userDisplayName}"`,
+                    `"${transaction.account?.name || 'Unknown Account'}"`,
+                    transaction.type,
+                    transaction.amount,
+                    transaction.approved ? 'Approved' : 'Pending'
+                ].join(',');
+            })
         ].join('\n');
         
         const blob = new Blob([csvContent], { type: 'text/csv' });

@@ -118,6 +118,14 @@
               </select>
             </div>
             
+            <!-- Child/User Filter (only show for parents) -->
+            <div class="col-md-2" id="child-filter-container" style="display: none;">
+              <label for="child" class="form-label">Child</label>
+              <select class="form-select" id="child">
+                <option value="">All Children</option>
+              </select>
+            </div>
+            
             <!-- Start Date -->
             <div class="col-md-2">
               <label for="start-date" class="form-label">From Date</label>
@@ -181,6 +189,7 @@
               <tr>
                 <th>Date</th>
                 <th>Description</th>
+                <th>User</th>
                 <th>Account</th>
                 <th>Type</th>
                 <th class="text-end">Amount</th>
