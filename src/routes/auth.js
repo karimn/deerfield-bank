@@ -54,7 +54,7 @@ router.get('/logout', (req, res, next) => {
     // Clear Auth0 session by redirecting to Auth0 logout URL
     const logoutURL = new URL(`https://${process.env.AUTH0_DOMAIN}/v2/logout`);
     logoutURL.searchParams.set('client_id', process.env.AUTH0_CLIENT_ID);
-    logoutURL.searchParams.set('returnTo', `${req.protocol}://${req.get('host')}/login.html`);
+    logoutURL.searchParams.set('returnTo', `https://${req.get('host')}/login.html`);
     
     res.redirect(logoutURL.toString());
   });
