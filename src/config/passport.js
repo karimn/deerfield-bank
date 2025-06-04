@@ -19,6 +19,11 @@ module.exports = function() {
         return done(null, user);
       }
       
+      // Ensure emails array exists and has at least one email
+      if (!profile.emails || !profile.emails[0] || !profile.emails[0].value) {
+        return done(null, false, { message: 'No email address found in Auth0 profile. Please try again.' });
+      }
+      
       // If no user with this Auth0 ID, check if a user exists with the email
       const profileEmail = profile.emails[0].value;
       user = await User.findOne({ email: profileEmail });

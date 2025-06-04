@@ -312,7 +312,7 @@ exports.deleteRecurringTransaction = async (req, res, next) => {
       }
     }
 
-    await recurringTransaction.remove();
+    await recurringTransaction.deleteOne();
 
     res.status(200).json({
       success: true,

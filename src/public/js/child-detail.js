@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const addAccountModal = new bootstrap.Modal(document.getElementById('addAccountModal'));
     const addTransactionModal = new bootstrap.Modal(document.getElementById('addTransactionModal'));
     const addAllowanceModal = new bootstrap.Modal(document.getElementById('addAllowanceModal'));
+    const addSubscriptionModal = new bootstrap.Modal(document.getElementById('addSubscriptionModal'));
     
     // Form elements
     const addAccountFormEl = document.getElementById('add-account-form');
@@ -36,6 +37,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const distributionTotalEl = document.getElementById('distribution-total');
     const recurringAllowanceEl = document.getElementById('recurring-allowance');
     
+    // Subscription form elements
+    const subscriptionFormEl = document.getElementById('subscription-form');
+    const subscriptionNameEl = document.getElementById('subscription-name');
+    const subscriptionDescriptionEl = document.getElementById('subscription-description');
+    const subscriptionAmountEl = document.getElementById('subscription-amount');
+    const subscriptionFrequencyEl = document.getElementById('subscription-frequency');
+    const subscriptionAccountEl = document.getElementById('subscription-account');
+    const subscriptionNextDateEl = document.getElementById('subscription-next-date');
+    
     // Will store references to distribution percent inputs dynamically
     const percentInputs = {};
     
@@ -46,6 +56,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const saveTransactionBtn = document.getElementById('save-transaction-btn');
     const addAllowanceBtn = document.getElementById('add-allowance-btn');
     const saveAllowanceBtn = document.getElementById('save-allowance-btn');
+    const saveSubscriptionBtn = document.getElementById('save-subscription-btn');
     const togglePermissionsBtn = document.getElementById('toggle-permissions-btn');
     
     // Current user and child data
@@ -191,6 +202,9 @@ document.addEventListener('DOMContentLoaded', function() {
       
       // Save allowance button
       saveAllowanceBtn.addEventListener('click', processAllowance);
+      
+      // Save subscription button
+      saveSubscriptionBtn.addEventListener('click', saveSubscription);
       
       // Toggle permissions button
       togglePermissionsBtn.addEventListener('click', () => {
@@ -512,18 +526,15 @@ document.addEventListener('DOMContentLoaded', function() {
           return;
         }
         
-        const response = await fetch(`${API_URL}/subscriptions`);
+        const response = await fetch(`${API_URL}/recurring?userId=${childId}&type=subscription`);
         const data = await response.json();
         
         if (!data.success) {
           throw new Error(data.error || 'Failed to load subscriptions');
         }
         
-        // Client-side filtering
-        const childSubscriptions = data.data.filter(subscription => {
-          const accountId = subscription.account._id || subscription.account;
-          return accountIds.includes(accountId);
-        });
+        // Data is already filtered by userId and type from API
+        const childSubscriptions = data.data;
         
         if (childSubscriptions.length === 0) {
           subscriptionsContainerEl.innerHTML = `
@@ -535,7 +546,7 @@ document.addEventListener('DOMContentLoaded', function() {
           
           // Add event listener for add subscription button
           document.getElementById('add-subscription-btn')?.addEventListener('click', () => {
-            alert('Subscription management feature coming soon!');
+            showSubscriptionModal();
           });
           
           return;
@@ -549,8 +560,10 @@ document.addEventListener('DOMContentLoaded', function() {
             ${childSubscriptions.map(subscription => {
               const nextDate = new Date(subscription.nextDate).toLocaleDateString();
               const amount = formatCurrency(subscription.amount);
-              const accountName = subscription.account.name || 'Unknown';
+              const accountName = subscription.account?.name || 'Unknown';
               const frequencyText = getFrequencyText(subscription.frequency);
+              const statusBadge = subscription.active ? 'bg-success' : 'bg-secondary';
+              const statusText = subscription.active ? 'Active' : 'Inactive';
               
               return `
                 <li class="list-group-item d-flex justify-content-between align-items-center">
@@ -558,8 +571,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     <strong>${subscription.name}</strong>
                     <div class="text-muted small">${frequencyText} • Next: ${nextDate}</div>
                     <div class="text-muted small">${accountName}</div>
+                    <span class="badge ${statusBadge} text-xs">${statusText}</span>
                   </div>
-                  <span class="badge bg-primary rounded-pill">${amount}</span>
+                  <div class="text-end">
+                    <span class="badge bg-primary rounded-pill">${amount}</span>
+                    <button class="btn btn-sm btn-outline-danger ms-2" onclick="deleteSubscription('${subscription._id}')">Delete</button>
+                  </div>
                 </li>
               `;
             }).join('')}
@@ -571,7 +588,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Add event listener for add subscription button
         document.getElementById('add-subscription-btn')?.addEventListener('click', () => {
-          alert('Subscription management feature coming soon!');
+          showSubscriptionModal();
         });
         
       } catch (error) {
@@ -1035,6 +1052,117 @@ document.addEventListener('DOMContentLoaded', function() {
     function capitalizeFirstLetter(string) {
       return string.charAt(0).toUpperCase() + string.slice(1);
     }
+    
+    // Show subscription modal
+    function showSubscriptionModal() {
+      // Reset form
+      subscriptionFormEl.reset();
+      
+      // Populate account dropdown
+      populateSubscriptionAccountDropdown();
+      
+      // Set default next date to next month
+      const nextMonth = new Date();
+      nextMonth.setMonth(nextMonth.getMonth() + 1);
+      subscriptionNextDateEl.value = nextMonth.toISOString().split('T')[0];
+      
+      // Show modal
+      addSubscriptionModal.show();
+    }
+    
+    // Populate subscription account dropdown
+    function populateSubscriptionAccountDropdown() {
+      subscriptionAccountEl.innerHTML = childAccounts.map(account => 
+        `<option value="${account._id}">${account.name} (${account.type})</option>`
+      ).join('');
+    }
+    
+    // Save subscription
+    async function saveSubscription() {
+      try {
+        const name = subscriptionNameEl.value.trim();
+        const description = subscriptionDescriptionEl.value.trim() || name;
+        const amount = parseFloat(subscriptionAmountEl.value);
+        const frequency = subscriptionFrequencyEl.value;
+        const accountId = subscriptionAccountEl.value;
+        const nextDate = subscriptionNextDateEl.value;
+        
+        if (!name || isNaN(amount) || amount <= 0 || !accountId || !nextDate) {
+          alert('Please fill out all required fields correctly');
+          return;
+        }
+        
+        // Create recurring transaction for subscription
+        const subscriptionData = {
+          name,
+          description,
+          amount,
+          type: 'subscription',
+          frequency,
+          account: accountId,
+          user: childId,
+          nextDate: new Date(nextDate),
+          active: true
+        };
+        
+        // Send to recurring transactions API
+        const response = await fetch(`${API_URL}/recurring`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(subscriptionData)
+        });
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to create subscription');
+        }
+        
+        // Close modal
+        addSubscriptionModal.hide();
+        
+        // Refresh subscriptions
+        await loadSubscriptions();
+        
+        // Success message
+        alert('Subscription created successfully!');
+        
+      } catch (error) {
+        console.error('Error saving subscription:', error);
+        alert(`Error: ${error.message}`);
+      }
+    }
+    
+    // Delete subscription (global function so it can be called from onclick)
+    window.deleteSubscription = async function(subscriptionId) {
+      if (!confirm('Are you sure you want to delete this subscription?')) {
+        return;
+      }
+      
+      try {
+        const response = await fetch(`${API_URL}/recurring/${subscriptionId}`, {
+          method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to delete subscription');
+        }
+        
+        // Refresh subscriptions
+        await loadSubscriptions();
+        
+        // Success message
+        alert('Subscription deleted successfully!');
+        
+      } catch (error) {
+        console.error('Error deleting subscription:', error);
+        alert(`Error: ${error.message}`);
+      }
+    };
     
     // Edit child function - opens modal to edit child details
     function editChild(childId) {
