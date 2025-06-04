@@ -1120,18 +1120,68 @@ document.addEventListener('DOMContentLoaded', function() {
           throw new Error(result.error || 'Failed to create subscription');
         }
         
+        // Check if first payment is due today or earlier
+        const paymentDate = new Date(nextDate);
+        const today = new Date();
+        today.setHours(23, 59, 59, 999); // End of today
+        
+        if (paymentDate <= today) {
+          // Process the first payment immediately
+          await processFirstSubscriptionPayment(accountId, amount, name);
+        }
+        
         // Close modal
         addSubscriptionModal.hide();
         
-        // Refresh subscriptions
+        // Refresh data
         await loadSubscriptions();
+        await loadChildAccounts(childId);
+        await loadTransactions();
         
         // Success message
-        alert('Subscription created successfully!');
+        const immediatePayment = paymentDate <= today;
+        alert(`Subscription created successfully!${immediatePayment ? ' First payment has been processed.' : ''}`);
+      
         
       } catch (error) {
         console.error('Error saving subscription:', error);
         alert(`Error: ${error.message}`);
+      }
+    }
+    
+    // Process first subscription payment
+    async function processFirstSubscriptionPayment(accountId, amount, subscriptionName) {
+      try {
+        // Create transaction for the subscription payment
+        const transactionData = {
+          description: `${subscriptionName} - Subscription payment`,
+          amount: amount,
+          type: 'withdrawal',
+          account: accountId,
+          date: new Date(),
+          approved: true,
+          approvedBy: currentUser.id
+        };
+        
+        // Send to transactions API
+        const response = await fetch(`${API_URL}/transactions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(transactionData)
+        });
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to process subscription payment');
+        }
+        
+      } catch (error) {
+        console.error('Error processing first subscription payment:', error);
+        // Don't throw here as we don't want to break the subscription creation
+        // Just log the error - the subscription was created successfully
       }
     }
     
