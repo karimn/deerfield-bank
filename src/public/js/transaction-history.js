@@ -256,6 +256,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     : transaction.account.owner.name)
                 : 'Unknown User';
             
+            // Actions column for parents only
+            let actionsHtml = '';
+            if (currentUser.role === 'parent' && !transaction.deleted) {
+                actionsHtml = `
+                    <button class="btn btn-sm btn-outline-danger delete-transaction" data-id="${transaction._id}" title="Delete Transaction">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                `;
+            }
+            
             row.innerHTML = `
                 <td>${formattedDate}</td>
                 <td>${transaction.description || 'N/A'}</td>
@@ -270,9 +280,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 <td>
                     <span class="badge bg-${statusClass}">${statusText}</span>
                 </td>
+                <td>
+                    ${actionsHtml}
+                </td>
             `;
             
             tableBody.appendChild(row);
+        });
+        
+        // Add event listeners to delete buttons
+        document.querySelectorAll('.delete-transaction').forEach(button => {
+            button.addEventListener('click', () => {
+                const transactionId = button.getAttribute('data-id');
+                deleteTransaction(transactionId);
+            });
         });
     }
     
@@ -457,6 +478,57 @@ document.addEventListener('DOMContentLoaded', function() {
     function showError(message) {
         const alertDiv = document.createElement('div');
         alertDiv.className = 'alert alert-danger alert-dismissible fade show';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        const container = document.querySelector('.container');
+        container.insertBefore(alertDiv, container.firstChild);
+        
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
+    }
+    
+    async function deleteTransaction(transactionId) {
+        try {
+            // Confirm deletion
+            if (!confirm('Are you sure you want to delete this transaction? This action will reverse any balance changes and cannot be undone.')) {
+                return;
+            }
+            
+            // Send delete request using the markTransactionDeleted endpoint
+            const response = await fetch(`${API_URL}/transactions/${transactionId}/delete`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                // Show success message
+                showSuccessMessage('Transaction deleted successfully');
+                
+                // Reload transactions to reflect the changes
+                await loadTransactions();
+            } else {
+                throw new Error(data.error || 'Failed to delete transaction');
+            }
+        } catch (error) {
+            console.error('Error deleting transaction:', error);
+            showError(`Failed to delete transaction: ${error.message}`);
+        }
+    }
+    
+    function showSuccessMessage(message) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-success alert-dismissible fade show';
         alertDiv.innerHTML = `
             ${message}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
