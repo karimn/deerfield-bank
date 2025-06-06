@@ -215,6 +215,12 @@ document.addEventListener('DOMContentLoaded', function() {
     function displayTransactions(transactions) {
         tableBody.innerHTML = '';
         
+        // Debug: log current user and first transaction
+        console.log('displayTransactions - currentUser:', currentUser);
+        if (transactions.length > 0) {
+            console.log('First transaction sample:', transactions[0]);
+        }
+        
         transactions.forEach(transaction => {
             const row = document.createElement('tr');
             row.className = transaction.rejected ? 'transaction-row rejected-transaction' : 'transaction-row';
@@ -258,12 +264,15 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Actions column for parents only
             let actionsHtml = '';
-            if (currentUser.role === 'parent' && !transaction.deleted) {
+            if (currentUser && currentUser.role === 'parent' && !transaction.deleted) {
                 actionsHtml = `
                     <button class="btn btn-sm btn-outline-danger delete-transaction" data-id="${transaction._id}" title="Delete Transaction">
                         <i class="bi bi-trash"></i>
                     </button>
                 `;
+            } else {
+                // Show dash for non-parents or deleted transactions
+                actionsHtml = '<span class="text-muted">-</span>';
             }
             
             row.innerHTML = `
