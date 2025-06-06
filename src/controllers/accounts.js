@@ -1,5 +1,6 @@
 const Account = require('../models/Account');
 const User = require('../models/User');
+const Transaction = require('../models/Transaction');
 
 // @desc    Get all accounts
 // @route   GET /api/accounts
@@ -123,6 +124,57 @@ exports.deleteAccount = async (req, res, next) => {
     res.status(200).json({
       success: true,
       data: {}
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Recalculate account balance based on transactions
+// @route   POST /api/accounts/:id/recalculate
+// @access  Private/Admin
+exports.recalculateBalance = async (req, res, next) => {
+  try {
+    const account = await Account.findById(req.params.id);
+    
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        error: 'Account not found'
+      });
+    }
+
+    // Get all approved transactions that are not rejected and not deleted
+    const transactions = await Transaction.find({
+      account: account._id,
+      approved: true,
+      rejected: { $ne: true },
+      deleted: { $ne: true }
+    });
+
+    // Calculate balance from transactions
+    let calculatedBalance = 0;
+    transactions.forEach(transaction => {
+      if (transaction.type === 'deposit' || transaction.type === 'interest') {
+        calculatedBalance += transaction.amount;
+      } else if (transaction.type === 'withdrawal' || transaction.type === 'subscription') {
+        calculatedBalance -= transaction.amount;
+      }
+    });
+
+    // Update account balance
+    account.balance = calculatedBalance;
+    await account.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Account balance recalculated successfully',
+      data: {
+        accountId: account._id,
+        oldBalance: req.body.oldBalance || 'unknown',
+        newBalance: calculatedBalance,
+        transactionCount: transactions.length
+      }
     });
   } catch (err) {
     next(err);

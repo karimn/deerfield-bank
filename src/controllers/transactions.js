@@ -71,9 +71,19 @@ exports.getTransactions = async (req, res, next) => {
       filter.rejected = req.query.rejected === 'true';
     }
     
+    // Filter by deleted status
+    if (req.query.deleted !== undefined) {
+      filter.deleted = req.query.deleted === 'true';
+    }
+    
     // If no specific rejected filter and no approval filter, exclude rejected transactions
     if (req.query.rejected === undefined && req.query.includeRejected !== 'true') {
       filter.rejected = { $ne: true };
+    }
+    
+    // If no specific deleted filter, exclude deleted transactions unless explicitly requested
+    if (req.query.deleted === undefined && req.query.includeDeleted !== 'true') {
+      filter.deleted = { $ne: true };
     }
     
     // Pagination
@@ -288,6 +298,74 @@ exports.deleteTransaction = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: 'Transaction rejected successfully',
+      data: updatedTransaction
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Delete transaction (mark as deleted)
+// @route   DELETE /api/transactions/:id/delete
+// @access  Private/Parent
+exports.markTransactionDeleted = async (req, res, next) => {
+  try {
+    const transaction = await Transaction.findById(req.params.id);
+    
+    if (!transaction) {
+      return res.status(404).json({
+        success: false,
+        error: 'Transaction not found'
+      });
+    }
+    
+    // Check if user is authorized (must be parent)
+    if (req.user.role !== 'parent') {
+      return res.status(403).json({
+        success: false,
+        error: 'Only parents can delete transactions'
+      });
+    }
+    
+    // If transaction is already deleted, return error
+    if (transaction.deleted) {
+      return res.status(400).json({
+        success: false,
+        error: 'Transaction is already deleted'
+      });
+    }
+    
+    // If transaction is approved and not rejected, update account balance (reverse the effect)
+    if (transaction.approved && !transaction.rejected) {
+      const account = await Account.findById(transaction.account);
+      
+      let newBalance = account.balance;
+      
+      // Reverse the original transaction effect
+      if (transaction.type === 'deposit' || transaction.type === 'interest') {
+        newBalance -= transaction.amount;
+      } else if (transaction.type === 'withdrawal' || transaction.type === 'subscription') {
+        newBalance += transaction.amount;
+      }
+      
+      // Update account balance
+      await Account.findByIdAndUpdate(account._id, { balance: newBalance });
+    }
+    
+    // Mark transaction as deleted
+    const updatedTransaction = await Transaction.findByIdAndUpdate(
+      req.params.id,
+      {
+        deleted: true,
+        deletedBy: req.user.id,
+        deletedAt: new Date()
+      },
+      { new: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Transaction deleted successfully',
       data: updatedTransaction
     });
   } catch (err) {

@@ -443,7 +443,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // In a real implementation, you'd pass these IDs to filter server-side
-        const response = await fetch(`${API_URL}/transactions?includeRejected=true`);
+        const response = await fetch(`${API_URL}/transactions?includeRejected=true&includeDeleted=true`);
         const data = await response.json();
         
         if (!data.success) {
@@ -479,24 +479,32 @@ document.addEventListener('DOMContentLoaded', function() {
           const amountPrefix = transaction.type === 'deposit' || transaction.type === 'interest' ? '+' : '-';
           const accountName = transaction.account.name || 'Unknown';
           let statusBadge;
-          if (transaction.rejected) {
+          let actionButtons = '';
+          
+          if (transaction.deleted) {
+            statusBadge = '<span class="badge bg-secondary">Deleted</span>';
+          } else if (transaction.rejected) {
             statusBadge = '<span class="badge bg-danger">Rejected</span>';
           } else if (transaction.approved) {
             statusBadge = '<span class="badge bg-success">Approved</span>';
+            // Only show delete button for approved transactions that aren't deleted
+            if (currentUser.role === 'parent') {
+              actionButtons = `<button class="btn btn-sm btn-outline-danger ms-1" onclick="deleteTransaction('${transaction._id}')">Delete</button>`;
+            }
           } else {
             statusBadge = '<span class="badge bg-warning text-dark">Pending</span>';
           }
           
-          const rowClass = transaction.rejected ? 'transaction-row rejected-transaction' : 'transaction-row';
-          const textClass = transaction.rejected ? 'text-muted' : '';
+          const rowClass = transaction.rejected || transaction.deleted ? 'transaction-row rejected-transaction' : 'transaction-row';
+          const textClass = transaction.rejected || transaction.deleted ? 'text-muted' : '';
           
           return `
             <tr class="${rowClass}">
               <td class="${textClass}">${date}</td>
               <td class="${textClass}">${transaction.description}</td>
               <td class="${textClass}">${accountName}</td>
-              <td class="${transaction.rejected ? 'text-muted' : amountClass}">${amountPrefix}${amount}</td>
-              <td>${statusBadge}</td>
+              <td class="${(transaction.rejected || transaction.deleted) ? 'text-muted' : amountClass}">${amountPrefix}${amount}</td>
+              <td>${statusBadge}${actionButtons}</td>
             </tr>
           `;
         }).join('');
@@ -1184,6 +1192,36 @@ document.addEventListener('DOMContentLoaded', function() {
         // Just log the error - the subscription was created successfully
       }
     }
+    
+    // Delete transaction (global function so it can be called from onclick)
+    window.deleteTransaction = async function(transactionId) {
+      if (!confirm('Are you sure you want to delete this transaction? This will reverse its effect on the account balance.')) {
+        return;
+      }
+      
+      try {
+        const response = await fetch(`${API_URL}/transactions/${transactionId}/delete`, {
+          method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to delete transaction');
+        }
+        
+        // Refresh data
+        await loadChildAccounts(childId);
+        await loadTransactions();
+        
+        // Success message
+        alert('Transaction deleted successfully!');
+        
+      } catch (error) {
+        console.error('Error deleting transaction:', error);
+        alert(`Error: ${error.message}`);
+      }
+    };
     
     // Delete subscription (global function so it can be called from onclick)
     window.deleteSubscription = async function(subscriptionId) {

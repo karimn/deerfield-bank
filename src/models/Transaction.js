@@ -46,6 +46,17 @@ const TransactionSchema = new mongoose.Schema(
     rejectedAt: {
       type: Date
     },
+    deleted: {
+      type: Boolean,
+      default: false
+    },
+    deletedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    deletedAt: {
+      type: Date
+    },
     subscription: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Subscription'

@@ -4,7 +4,8 @@ const {
   getAccount,
   createAccount,
   updateAccount,
-  deleteAccount
+  deleteAccount,
+  recalculateBalance
 } = require('../controllers/accounts');
 
 const router = express.Router();
@@ -17,5 +18,8 @@ router.route('/:id')
   .get(getAccount)
   .put(updateAccount)
   .delete(deleteAccount);
+
+router.route('/:id/recalculate')
+  .post(recalculateBalance);
 
 module.exports = router;
