@@ -489,7 +489,7 @@ document.addEventListener('DOMContentLoaded', function() {
             statusBadge = '<span class="badge bg-success">Approved</span>';
             // Only show delete button for approved transactions that aren't deleted
             if (currentUser.role === 'parent') {
-              actionButtons = `<button class="btn btn-sm btn-outline-danger ms-1" onclick="deleteTransaction('${transaction._id}')">Delete</button>`;
+              actionButtons = `<button class="btn btn-sm btn-outline-danger ms-1" onclick="deleteTransaction('${transaction._id}')" title="Delete Transaction"><i class="bi bi-trash"></i></button>`;
             }
           } else {
             statusBadge = '<span class="badge bg-warning text-dark">Pending</span>';
@@ -583,7 +583,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   </div>
                   <div class="text-end">
                     <span class="badge bg-primary rounded-pill">${amount}</span>
-                    <button class="btn btn-sm btn-outline-danger ms-2" onclick="deleteSubscription('${subscription._id}')">Delete</button>
+                    <button class="btn btn-sm btn-outline-danger ms-2" onclick="deleteSubscription('${subscription._id}')" title="Delete Subscription"><i class="bi bi-trash"></i></button>
                   </div>
                 </li>
               `;

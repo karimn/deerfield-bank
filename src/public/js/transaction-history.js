@@ -42,6 +42,12 @@ document.addEventListener('DOMContentLoaded', function() {
             
             currentUser = authData.user;
             
+            // Update dashboard link based on user role
+            const dashboardLink = document.querySelector('a[href="/dashboard.html"]');
+            if (dashboardLink && currentUser.role === 'parent') {
+                dashboardLink.href = '/parent-dashboard.html';
+            }
+            
             // Load user accounts and children for filter dropdowns
             await loadUserAccounts();
             await loadChildren();
@@ -214,12 +220,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function displayTransactions(transactions) {
         tableBody.innerHTML = '';
-        
-        // Debug: log current user and first transaction
-        console.log('displayTransactions - currentUser:', currentUser);
-        if (transactions.length > 0) {
-            console.log('First transaction sample:', transactions[0]);
-        }
         
         transactions.forEach(transaction => {
             const row = document.createElement('tr');
