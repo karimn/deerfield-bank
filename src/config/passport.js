@@ -31,7 +31,7 @@ module.exports = function() {
       if (user) {
         // Email exists but not linked to Auth0, update the user
         user.auth0Id = profile.id;
-        await user.save();
+        await user.save({ w: 'majority' });
         return done(null, user);
       }
       
@@ -43,7 +43,7 @@ module.exports = function() {
       if (userCaseInsensitive) {
         // Email exists with different case but not linked to Auth0, update the user
         userCaseInsensitive.auth0Id = profile.id;
-        await userCaseInsensitive.save();
+        await userCaseInsensitive.save({ w: 'majority' });
         return done(null, userCaseInsensitive);
       }
       
