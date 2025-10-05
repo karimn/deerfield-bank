@@ -1,5 +1,11 @@
 {
     "version": 2,
+    "crons": [
+      {
+        "path": "/api/automation/process-recurring",
+        "schedule": "0 6 * * *"
+      }
+    ],
     "builds": [
       {
         "src": "src/server.js",
