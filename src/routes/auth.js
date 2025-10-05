@@ -31,15 +31,21 @@ router.get('/auth0/callback', (req, res, next) => {
       if (err) {
         return next(err);
       }
-      
+
       // User successfully logged in
-      
-      // Successful authentication - redirect based on user role
-      if (user.role === 'parent') {
-        res.redirect('/parent-dashboard.html');
-      } else {
-        res.redirect('/dashboard.html');
-      }
+      // Save session before redirecting to avoid race condition
+      req.session.save((err) => {
+        if (err) {
+          return next(err);
+        }
+
+        // Successful authentication - redirect based on user role
+        if (user.role === 'parent') {
+          res.redirect('/parent-dashboard.html');
+        } else {
+          res.redirect('/dashboard.html');
+        }
+      });
     });
   })(req, res, next);
 });
