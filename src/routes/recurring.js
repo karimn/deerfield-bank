@@ -5,7 +5,9 @@ const {
   createRecurringTransaction,
   updateRecurringTransaction,
   deleteRecurringTransaction,
-  processRecurringTransactions
+  processRecurringTransactions,
+  initializeInterestTransactions,
+  getInterestTransactions
 } = require('../controllers/recurringTransactions');
 
 const router = express.Router();
@@ -21,5 +23,11 @@ router.route('/:id')
 
 router.route('/process')
   .post(processRecurringTransactions);
+
+router.route('/initialize-interest')
+  .post(initializeInterestTransactions);
+
+router.route('/interest')
+  .get(getInterestTransactions);
 
 module.exports = router;

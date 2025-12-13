@@ -328,6 +328,11 @@ exports.deleteRecurringTransaction = async (req, res, next) => {
 // @access  Private/Admin
 exports.processRecurringTransactions = async (req, res, next) => {
   try {
+    // First, update/create interest recurring transactions for all eligible accounts
+    const interestService = require('../services/interestService');
+    await interestService.createInterestRecurringTransactions();
+    await interestService.updateInterestAmounts();
+    
     // Get all active recurring transactions due for processing
     const now = new Date();
     const recurringTransactions = await RecurringTransaction.find({
@@ -469,6 +474,42 @@ function calculateNextDate(currentDate, frequency) {
   
   return date;
 }
+
+// @desc    Initialize/Update interest recurring transactions
+// @route   POST /api/recurring/initialize-interest
+// @access  Private/Parent
+exports.initializeInterestTransactions = async (req, res, next) => {
+  try {
+    const interestService = require('../services/interestService');
+    const result = await interestService.createInterestRecurringTransactions();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Interest recurring transactions initialized successfully',
+      data: result
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get interest recurring transactions
+// @route   GET /api/recurring/interest
+// @access  Private
+exports.getInterestTransactions = async (req, res, next) => {
+  try {
+    const interestService = require('../services/interestService');
+    const transactions = await interestService.getInterestTransactions(req.user.id, req.user.role);
+    
+    res.status(200).json({
+      success: true,
+      count: transactions.length,
+      data: transactions
+    });
+  } catch (err) {
+    next(err);
+  }
+};
 
 // Helper function
 function capitalizeFirstLetter(string) {

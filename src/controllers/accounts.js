@@ -70,6 +70,18 @@ exports.createAccount = async (req, res, next) => {
     
     const account = await Account.create(req.body);
     
+    // If this is a savings or donation account with interest rate > 0, 
+    // trigger interest recurring transaction creation
+    if ((account.type === 'saving' || account.type === 'donation') && account.interestRate > 0) {
+      try {
+        const interestService = require('../services/interestService');
+        await interestService.createInterestRecurringTransactions();
+      } catch (error) {
+        console.error('Error creating interest recurring transaction for new account:', error);
+        // Don't fail the account creation if interest setup fails
+      }
+    }
+    
     res.status(201).json({
       success: true,
       data: account
@@ -94,6 +106,17 @@ exports.updateAccount = async (req, res, next) => {
         success: false,
         error: 'Account not found'
       });
+    }
+
+    // If this is a savings or donation account, update interest recurring transactions
+    if (account.type === 'saving' || account.type === 'donation') {
+      try {
+        const interestService = require('../services/interestService');
+        await interestService.createInterestRecurringTransactions();
+      } catch (error) {
+        console.error('Error updating interest recurring transaction for account:', error);
+        // Don't fail the account update if interest setup fails
+      }
     }
 
     res.status(200).json({
