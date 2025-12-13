@@ -1,54 +1,45 @@
+/**
+ * SCHEDULER.JS - NOT USED IN PRODUCTION
+ *
+ * This file is kept for local development testing only.
+ *
+ * IMPORTANT: On Vercel (serverless), node-cron does NOT work because:
+ * - Serverless functions only run when invoked
+ * - No long-running processes are maintained
+ * - Cron jobs require persistent processes
+ *
+ * PRODUCTION SCHEDULING:
+ * - Use external cron service (cron-job.org, UptimeRobot, etc.)
+ * - Or use Vercel Cron (requires Pro plan)
+ * - Or use GitHub Actions (can be disabled after 60 days inactivity)
+ *
+ * See RECURRING_TRANSACTIONS_SETUP.md for setup instructions.
+ */
+
 const cron = require('node-cron');
 const axios = require('axios');
 
-// You'll need to install these dependencies:
-// npm install node-cron axios
-
-// Process all recurring transactions daily (midnight)
+// For local development only - process recurring transactions daily
 cron.schedule('0 0 * * *', async () => {
   try {
-    console.log('Processing recurring transactions');
-    // Make API call to the recurring transactions processing endpoint
-    const baseUrl = process.env.NODE_ENV === 'production' 
-      ? process.env.PRODUCTION_URL || 'https://deerfield-bank.vercel.app'
-      : 'http://localhost:5000';
-    
-    const response = await axios.post(`${baseUrl}/api/recurring/process`);
-    
+    console.log('[DEV] Processing recurring transactions');
+    const baseUrl = 'http://localhost:5000';
+    const response = await axios.post(`${baseUrl}/api/automation/process-recurring`);
     const { processed, errors } = response.data;
-    console.log(`Processed ${processed} recurring transactions with ${errors} errors`);
+    console.log(`[DEV] Processed ${processed} recurring transactions with ${errors} errors`);
   } catch (error) {
-    console.error('Error processing recurring transactions:', error.message);
+    console.error('[DEV] Error processing recurring transactions:', error.message);
   }
 });
 
-// Legacy endpoints - kept for backward compatibility
-// These are now handled by the recurring transactions system
-
-// Run weekly for allowance (Sunday at midnight)
-cron.schedule('0 0 * * 0', async () => {
-  try {
-    console.log('Running legacy weekly allowance job');
-    const baseUrl = process.env.NODE_ENV === 'production' 
-      ? process.env.PRODUCTION_URL || 'https://deerfield-bank.vercel.app'
-      : 'http://localhost:5000';
-    await axios.post(`${baseUrl}/api/allowance/process`);
-  } catch (error) {
-    console.error('Error processing weekly allowance:', error.message);
+// Export a function that logs a warning when called
+module.exports = {
+  startScheduler: () => {
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('WARNING: scheduler.js does not work on Vercel serverless. Use external cron service instead.');
+      console.warn('See RECURRING_TRANSACTIONS_SETUP.md for setup instructions.');
+    } else {
+      console.log('[DEV] Local scheduler started - recurring transactions will process daily at midnight');
+    }
   }
-});
-
-// Run monthly for interest (1st day of month at midnight)
-cron.schedule('0 0 1 * *', async () => {
-  try {
-    console.log('Running legacy monthly interest calculation');
-    const baseUrl = process.env.NODE_ENV === 'production' 
-      ? process.env.PRODUCTION_URL || 'https://deerfield-bank.vercel.app'
-      : 'http://localhost:5000';
-    await axios.post(`${baseUrl}/api/interest/calculate`);
-  } catch (error) {
-    console.error('Error calculating interest:', error.message);
-  }
-});
-
-module.exports = { startScheduler: () => console.log('Scheduler running...') };
+};

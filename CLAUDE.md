@@ -5,10 +5,14 @@
 - `npm start` - Start production server
 
 ## Deployment
-- **Platform**: Vercel (configured with vercel.json)
-- **Configuration**: src/vercel.json handles routing for Node.js serverless functions
+- **Platform**: Vercel (serverless functions - configured with vercel.json)
+- **Configuration**: vercel.json handles routing for Node.js serverless functions
 - **Database**: MongoDB (separate dev/prod URIs configured in db.js)
 - **Authentication**: Auth0 (replaces Google OAuth)
+- **Recurring Transactions**: Requires external scheduling (see RECURRING_TRANSACTIONS_SETUP.md)
+  - **IMPORTANT**: node-cron in scheduler.js does NOT work on Vercel serverless
+  - Use external cron service (cron-job.org, UptimeRobot) or Vercel Cron (Pro plan)
+  - Endpoint: `https://your-domain.vercel.app/api/automation/process-recurring`
 - **Environment Variables needed for production**:
   - `NODE_ENV=production`
   - `MONGO_URI_PROD=<mongodb_connection_string>`
