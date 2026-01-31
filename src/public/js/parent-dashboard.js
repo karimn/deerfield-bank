@@ -138,10 +138,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 5. Set up event listeners
         setupEventListeners();
-        
-        // 6. Update distribution total
-        updateDistributionTotal();
-        
+
         // Edit functionality has been moved to child-detail.html page
         
       } catch (error) {
