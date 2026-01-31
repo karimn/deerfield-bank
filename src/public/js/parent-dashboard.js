@@ -57,9 +57,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const addChildBtn = document.getElementById('add-child-btn');
     const saveChildBtn = document.getElementById('save-child-btn');
     const processRecurringBtn = document.getElementById('process-recurring-btn');
-    const processAllowanceBtn = document.getElementById('process-allowance-btn');
-    const calculateInterestBtn = document.getElementById('calculate-interest-btn');
-    const processSubscriptionsBtn = document.getElementById('process-subscriptions-btn');
     const approveTransactionBtn = document.getElementById('approve-transaction-btn');
     const rejectTransactionBtn = document.getElementById('reject-transaction-btn');
     const refreshRecurringBtn = document.getElementById('refresh-recurring-btn');
@@ -75,14 +72,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const quickTransactionTypeEl = document.getElementById('quick-transaction-type');
     const quickTransactionAccountEl = document.getElementById('quick-transaction-account');
     const saveQuickTransactionBtn = document.getElementById('save-quick-transaction-btn');
-    
-    // Allowance settings elements
-    const allowanceSettingsFormEl = document.getElementById('allowance-settings-form');
-    const defaultAllowanceEl = document.getElementById('default-allowance');
-    const spendingPercentEl = document.getElementById('spending-percent');
-    const savingPercentEl = document.getElementById('saving-percent');
-    const donationPercentEl = document.getElementById('donation-percent');
-    const distributionTotalEl = document.getElementById('distribution-total');
     
     // Current user and data
     let currentUser = null;
@@ -708,15 +697,6 @@ function addChildButtonEventListeners() {
       // Process all recurring transactions button
       processRecurringBtn.addEventListener('click', processRecurringTransactions);
       
-      // Process allowance button
-      processAllowanceBtn.addEventListener('click', processAllowance);
-      
-      // Calculate interest button
-      calculateInterestBtn.addEventListener('click', calculateInterest);
-      
-      // Process subscriptions button
-      processSubscriptionsBtn.addEventListener('click', processSubscriptions);
-      
       // Approve transaction button
       approveTransactionBtn.addEventListener('click', () => {
         approveTransaction(currentTransactionId);
@@ -726,14 +706,6 @@ function addChildButtonEventListeners() {
       rejectTransactionBtn.addEventListener('click', () => {
         rejectTransaction(currentTransactionId);
       });
-      
-      // Allowance settings form
-      allowanceSettingsFormEl.addEventListener('submit', saveAllowanceSettings);
-      
-      // Distribution percentage inputs
-      spendingPercentEl.addEventListener('input', updateDistributionTotal);
-      savingPercentEl.addEventListener('input', updateDistributionTotal);
-      donationPercentEl.addEventListener('input', updateDistributionTotal);
       
       // Recurring transactions buttons
       refreshRecurringBtn.addEventListener('click', loadRecurringTransactions);
@@ -782,23 +754,6 @@ function addChildButtonEventListeners() {
       
       // Quick transaction save button
       saveQuickTransactionBtn.addEventListener('click', saveQuickTransaction);
-    }
-    
-    // Update distribution total
-    function updateDistributionTotal() {
-      const spendingPercent = parseInt(spendingPercentEl.value) || 0;
-      const savingPercent = parseInt(savingPercentEl.value) || 0;
-      const donationPercent = parseInt(donationPercentEl.value) || 0;
-      
-      const total = spendingPercent + savingPercent + donationPercent;
-      
-      distributionTotalEl.textContent = `Total: ${total}%`;
-      
-      if (total !== 100) {
-        distributionTotalEl.classList.add('text-danger');
-      } else {
-        distributionTotalEl.classList.remove('text-danger');
-      }
     }
     
     // Save child
@@ -927,100 +882,6 @@ function addChildButtonEventListeners() {
     }
     
     // Process allowance
-    async function processAllowance() {
-      try {
-        if (!confirm('Are you sure you want to process weekly allowance for all children?')) {
-          return;
-        }
-        
-        // Get allowance settings
-        const amount = parseFloat(defaultAllowanceEl.value) || 10;
-        const distribution = {
-          spending: parseInt(spendingPercentEl.value) || 34,
-          saving: parseInt(savingPercentEl.value) || 33,
-          donation: parseInt(donationPercentEl.value) || 33
-        };
-        
-        const response = await fetch(`${API_URL}/allowance/process`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ amount, distribution })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          alert(`Allowance processed successfully! Created ${data.count} transactions.`);
-          // Refresh the page to show updated balances
-          location.reload();
-        } else {
-          throw new Error(data.error || 'Failed to process allowance');
-        }
-        
-      } catch (error) {
-        console.error('Error processing allowance:', error);
-        alert(`Error: ${error.message}`);
-      }
-    }
-    
-    // Calculate interest
-    async function calculateInterest() {
-      try {
-        if (!confirm('Are you sure you want to calculate and apply monthly interest?')) {
-          return;
-        }
-        
-        const response = await fetch(`${API_URL}/interest/calculate`, {
-          method: 'POST'
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          alert(`Interest calculated successfully! Created ${data.count} transactions.`);
-          // Refresh the page to show updated balances
-          location.reload();
-        } else {
-          throw new Error(data.error || 'Failed to calculate interest');
-        }
-        
-      } catch (error) {
-        console.error('Error calculating interest:', error);
-        alert(`Error: ${error.message}`);
-      }
-    }
-    
-    // Process subscriptions
-    async function processSubscriptions() {
-      try {
-        if (!confirm('Are you sure you want to process due subscriptions?')) {
-          return;
-        }
-        
-        const response = await fetch(`${API_URL}/recurring/process`, {
-          method: 'POST'
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          alert(`Processed ${data.processed} recurring transactions with ${data.errors} errors.`);
-          
-          // Refresh recurring transactions to show updated next dates
-          await loadRecurringTransactions();
-          
-        } else {
-          throw new Error(data.error || 'Failed to process subscriptions');
-        }
-        
-      } catch (error) {
-        console.error('Error processing subscriptions:', error);
-        alert(`Error: ${error.message}`);
-      }
-    }
-    
     // Toggle distribution fields based on transaction type
     function toggleDistributionFields() {
       if (recurringTypeEl.value === 'allowance') {
@@ -1349,25 +1210,6 @@ function addChildButtonEventListeners() {
         console.error('Error rejecting transaction:', error);
         alert(`Error: ${error.message}`);
       }
-    }
-    
-    // Save allowance settings
-    async function saveAllowanceSettings(event) {
-      event.preventDefault();
-      
-      const spendingPercent = parseInt(spendingPercentEl.value) || 0;
-      const savingPercent = parseInt(savingPercentEl.value) || 0;
-      const donationPercent = parseInt(donationPercentEl.value) || 0;
-      
-      const total = spendingPercent + savingPercent + donationPercent;
-      
-      if (total !== 100) {
-        alert('Distribution percentages must add up to 100%');
-        return;
-      }
-      
-      // In a real app, you would save these settings to the database
-      alert('Settings saved successfully!');
     }
     
     // Format currency
