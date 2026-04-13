@@ -14,7 +14,9 @@ const { ensureAuth } = require('./middleware/auth');
 // Load env vars
 dotenv.config();
 
-// Connect to database
+// Kick off the initial DB connection attempt at module load time.
+// The connection-guard middleware below ensures every request waits
+// for it to finish on cold serverless starts.
 connectDB();
 
 // Passport config
@@ -29,6 +31,18 @@ app.use(cors());
 app.use(helmet({
   contentSecurityPolicy: false
 }));
+
+// Connection-guard: ensures Mongoose is connected before any handler runs.
+// On warm serverless instances connectDB() returns immediately (readyState === 1).
+// On cold starts it awaits the connection established at module load time.
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
 
 // Logging middleware
 if (process.env.NODE_ENV === 'development') {
